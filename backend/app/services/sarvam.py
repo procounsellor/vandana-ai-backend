@@ -4,7 +4,8 @@ import re
 import tempfile
 import os
 import requests
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Generator
 from pydub import AudioSegment
 from app.config import SARVAM_API_KEY
 
@@ -137,34 +138,49 @@ def _tts_chunk(text: str, sarvam_lang: str, speaker: str) -> bytes:
     return base64.b64decode(response.json()["audios"][0])
 
 
-def text_to_speech(text: str, language_code: str = "en") -> list[bytes]:
+def text_to_speech_stream(text: str, language_code: str = "en") -> Generator[bytes, None, None]:
     """
-    Convert text to speech using Sarvam AI.
-    Returns a list of WAV byte chunks (one per TTS call).
-    Caller is responsible for playing them sequentially.
+    Convert text to speech, yielding each WAV chunk as soon as it is ready (in order).
+    All Sarvam calls run in parallel; chunks are yielded in original text order.
     """
     sarvam_lang = LANGUAGE_MAP.get(language_code, "en-IN")
     speaker = TTS_SPEAKERS.get(language_code, "anushka")
     text = _clean_for_tts(text)
     chunks = _split_text(text)
 
-    print(f"TTS: {len(chunks)} chunks, chars={[len(c) for c in chunks]}, bytes={[len(c.encode('utf-8')) for c in chunks]}")
+    print(f"TTS: {len(chunks)} chunks, bytes={[len(c.encode('utf-8')) for c in chunks]}")
     for i, c in enumerate(chunks):
         print(f"  Chunk {i+1}: {c[:80]}...")
 
-    # Process all chunks in parallel — reduces total TTS time from N×2s to ~2s
-    def process(args):
-        idx, chunk = args
-        wav = _tts_chunk(chunk, sarvam_lang, speaker)
-        print(f"  Chunk {idx+1} done, {len(wav)} bytes")
-        return idx, wav
+    if not chunks:
+        return
 
-    results = [None] * len(chunks)
-    with ThreadPoolExecutor(max_workers=len(chunks)) as executor:
-        for idx, wav in executor.map(process, enumerate(chunks)):
-            results[idx] = wav
+    pending: dict[int, bytes] = {}
+    next_idx = 0
 
-    return [w for w in results if w]
+    with ThreadPoolExecutor(max_workers=min(len(chunks), 6)) as executor:
+        future_to_idx = {executor.submit(_tts_chunk, chunk, sarvam_lang, speaker): i
+                         for i, chunk in enumerate(chunks)}
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            wav = future.result()
+            if wav:
+                pending[idx] = wav
+                print(f"  Chunk {idx+1} ready, {len(wav)} bytes")
+            # Yield consecutive ready chunks in order
+            while next_idx in pending:
+                yield pending.pop(next_idx)
+                next_idx += 1
+
+    # Yield any remaining (shouldn't happen, but safety)
+    while next_idx in pending:
+        yield pending.pop(next_idx)
+        next_idx += 1
+
+
+def text_to_speech(text: str, language_code: str = "en") -> list[bytes]:
+    """Convenience wrapper — collects all streamed chunks into a list."""
+    return list(text_to_speech_stream(text, language_code))
 
 
 def speech_to_text(audio_bytes: bytes, filename: str = "audio.wav", language_code: str = "en") -> str:
