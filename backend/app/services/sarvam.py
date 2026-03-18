@@ -1,0 +1,203 @@
+import base64
+import io
+import re
+import tempfile
+import os
+import requests
+from concurrent.futures import ThreadPoolExecutor
+from pydub import AudioSegment
+from app.config import SARVAM_API_KEY
+
+SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
+SARVAM_STT_URL = "https://api.sarvam.ai/speech-to-text"
+
+# Language code mapping from our app's language_code to Sarvam's format
+LANGUAGE_MAP = {
+    "en": "en-IN",
+    "hi": "hi-IN",
+    "te": "te-IN",
+    "ta": "ta-IN",
+    "kn": "kn-IN",
+    "ml": "ml-IN",
+    "gu": "gu-IN",
+    "mr": "mr-IN",
+    "bn": "bn-IN",
+    "pa": "pa-IN",
+}
+
+TTS_MODEL = "bulbul:v2"
+
+# bulbul:v2 female speakers
+TTS_SPEAKERS = {
+    "en": "anushka",
+    "hi": "anushka",
+    "te": "anushka",
+    "ta": "anushka",
+    "kn": "anushka",
+    "ml": "anushka",
+    "gu": "anushka",
+    "mr": "anushka",
+    "bn": "anushka",
+    "pa": "anushka",
+}
+
+
+CHUNK_MAX_BYTES = 400  # UTF-8 bytes — Devanagari is 3 bytes/char, so 400 bytes ≈ 130 Hindi chars (~1 sentence)
+
+
+def _clean_for_tts(text: str) -> str:
+    """Strip markdown formatting so TTS reads cleanly."""
+    # Remove markdown headers
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    # Strip bold/italic asterisks and underscores
+    text = re.sub(r"\*+", "", text)
+    text = re.sub(r"_+", "", text)
+    # Remove numbered list prefixes
+    text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
+    # Remove bullet points
+    text = re.sub(r"^\s*[-•]\s+", "", text, flags=re.MULTILINE)
+    # Remove backticks
+    text = re.sub(r"`+", "", text)
+    # Replace dandas with period+space so each line becomes its own sentence boundary
+    text = text.replace('॥', '. ')
+    text = text.replace('।', '. ')
+    # Collapse newlines to spaces
+    text = re.sub(r"\n+", " ", text)
+    # Collapse multiple spaces
+    text = re.sub(r"\s{2,}", " ", text)
+    return text.strip()
+
+
+def _split_text(text: str, max_bytes: int = CHUNK_MAX_BYTES) -> list[str]:
+    """Split text into chunks measured by UTF-8 bytes (handles multi-byte scripts like Devanagari)."""
+    text = text.strip()
+    if len(text.encode("utf-8")) <= max_bytes:
+        return [text]
+
+    chunks = []
+    while len(text.encode("utf-8")) > max_bytes:
+        # Binary search: find max character count whose UTF-8 encoding fits in max_bytes
+        lo, hi = 0, len(text)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if len(text[:mid].encode("utf-8")) <= max_bytes:
+                lo = mid
+            else:
+                hi = mid - 1
+        limit = lo
+
+        # Split at sentence boundary (dandas already replaced with . and , by clean step)
+        split_at = -1
+        for punct in [". ", "! ", "? "]:
+            pos = text.rfind(punct, 0, limit)
+            if pos > split_at:
+                split_at = pos + len(punct)
+
+        if split_at <= 0:
+            split_at = text.rfind(" ", 0, limit)
+        if split_at <= 0:
+            split_at = limit
+
+        chunks.append(text[:split_at].strip())
+        text = text[split_at:].strip()
+
+    if text:
+        chunks.append(text)
+
+    return chunks
+
+
+def _is_shloka(text: str) -> bool:
+    """Pure Devanagari with no ASCII letters → likely a Sanskrit shloka line."""
+    return not bool(re.search(r'[a-zA-Z]', text)) and bool(re.search(r'[\u0900-\u097F]', text))
+
+
+def _tts_chunk(text: str, sarvam_lang: str, speaker: str) -> bytes:
+    """Call Sarvam TTS for a single chunk and return WAV bytes."""
+    if not text.strip():
+        return b''
+    pace = 0.75 if _is_shloka(text) else 0.9
+    response = requests.post(
+        SARVAM_TTS_URL,
+        headers={"api-subscription-key": SARVAM_API_KEY, "Content-Type": "application/json"},
+        json={
+            "text": text,
+            "target_language_code": sarvam_lang,
+            "model": TTS_MODEL,
+            "speaker": speaker,
+            "pace": pace,
+            "speech_sample_rate": 16000,
+            "output_audio_codec": "wav",
+        },
+        timeout=30,
+    )
+    if not response.ok:
+        print(f"Sarvam TTS error {response.status_code}: {response.text}")
+        response.raise_for_status()
+    return base64.b64decode(response.json()["audios"][0])
+
+
+def text_to_speech(text: str, language_code: str = "en") -> list[bytes]:
+    """
+    Convert text to speech using Sarvam AI.
+    Returns a list of WAV byte chunks (one per TTS call).
+    Caller is responsible for playing them sequentially.
+    """
+    sarvam_lang = LANGUAGE_MAP.get(language_code, "en-IN")
+    speaker = TTS_SPEAKERS.get(language_code, "anushka")
+    text = _clean_for_tts(text)
+    chunks = _split_text(text)
+
+    print(f"TTS: {len(chunks)} chunks, chars={[len(c) for c in chunks]}, bytes={[len(c.encode('utf-8')) for c in chunks]}")
+    for i, c in enumerate(chunks):
+        print(f"  Chunk {i+1}: {c[:80]}...")
+
+    wav_chunks = []
+    for i, chunk in enumerate(chunks):
+        print(f"  Processing chunk {i+1}/{len(chunks)}...")
+        wav_bytes = _tts_chunk(chunk, sarvam_lang, speaker)
+        if wav_bytes:
+            wav_chunks.append(wav_bytes)
+            print(f"  Chunk {i+1} done, {len(wav_bytes)} bytes")
+        else:
+            print(f"  Chunk {i+1} skipped (empty after cleaning)")
+
+    return wav_chunks
+
+
+def speech_to_text(audio_bytes: bytes, filename: str = "audio.wav", language_code: str = "en") -> str:
+    """
+    Convert speech to text using Sarvam AI.
+    Returns the transcript string.
+    """
+    sarvam_lang = LANGUAGE_MAP.get(language_code, "en-IN")
+
+    # Convert to WAV (16kHz mono) using a temp file — pydub needs seekable file
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "webm"
+    with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp_in:
+        tmp_in.write(audio_bytes)
+        tmp_in_path = tmp_in.name
+
+    try:
+        audio = AudioSegment.from_file(tmp_in_path, format=ext)
+        audio = audio.set_frame_rate(16000).set_channels(1)
+        wav_buffer = io.BytesIO()
+        audio.export(wav_buffer, format="wav")
+        wav_bytes = wav_buffer.getvalue()
+    finally:
+        os.unlink(tmp_in_path)
+
+    response = requests.post(
+        SARVAM_STT_URL,
+        headers={"api-subscription-key": SARVAM_API_KEY},
+        files={"file": ("audio.wav", wav_bytes, "audio/wav")},
+        data={
+            "model": "saarika:v2.5",
+            "language_code": sarvam_lang,
+        },
+        timeout=30,
+    )
+    if not response.ok:
+        print(f"Sarvam STT error {response.status_code}: {response.text}")
+        raise ValueError(f"Sarvam STT error {response.status_code}: {response.text}")
+    return response.json().get("transcript", "")

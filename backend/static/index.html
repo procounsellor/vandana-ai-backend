@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vandana AI</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #1a0f00;
+      color: #f5e6c8;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    header {
+      width: 100%;
+      padding: 14px 20px;
+      text-align: center;
+      background: linear-gradient(180deg, #2d1a00 0%, transparent 100%);
+      border-bottom: 1px solid #8b6914;
+    }
+
+    header h1 { font-size: 1.5rem; color: #f0c060; letter-spacing: 2px; }
+    header p { font-size: 0.8rem; color: #c8a96e; margin-top: 2px; }
+
+    #main {
+      display: flex;
+      flex: 1;
+      width: 100%;
+      max-width: 1100px;
+      overflow: hidden;
+      gap: 0;
+    }
+
+    /* ── Avatar Panel ── */
+    #avatar-panel {
+      width: 300px;
+      min-width: 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      border-right: 1px solid #3d2400;
+      gap: 16px;
+    }
+
+    #avatar-video {
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid #8b6914;
+      background: #2a1800;
+      display: none;
+    }
+
+    #avatar-placeholder {
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: #2a1800;
+      border: 3px solid #5a3e10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #6b4f20;
+    }
+
+    #avatar-placeholder .om { font-size: 4rem; color: #8b6914; }
+    #avatar-placeholder span { font-size: 0.8rem; }
+
+    #avatar-status {
+      font-size: 0.78rem;
+      color: #8b6914;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    #mic-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 2px solid #8b6914;
+      background: #2a1800;
+      color: #f0c060;
+      font-size: 1.4rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #mic-btn:hover { background: #3d2400; border-color: #f0c060; }
+    #mic-btn.recording { background: #8b0000; border-color: #ff4444; animation: pulse 1s infinite; }
+    #mic-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #lang-select {
+      background: #2a1800;
+      border: 1px solid #8b6914;
+      border-radius: 10px;
+      color: #f5e6c8;
+      font-size: 0.85rem;
+      padding: 6px 10px;
+      cursor: pointer;
+      outline: none;
+    }
+    #lang-select:focus { border-color: #f0c060; }
+
+    @keyframes pulse { 50% { transform: scale(1.08); } }
+
+    /* ── Chat Panel ── */
+    #chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message { display: flex; flex-direction: column; max-width: 85%; }
+    .message.user { align-self: flex-end; align-items: flex-end; }
+    .message.assistant { align-self: flex-start; align-items: flex-start; }
+
+    .message .label {
+      font-size: 0.68rem;
+      color: #8b6914;
+      margin-bottom: 4px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .message .bubble {
+      padding: 12px 16px;
+      border-radius: 16px;
+      line-height: 1.7;
+      font-size: 0.92rem;
+      white-space: pre-wrap;
+    }
+
+    .message.user .bubble {
+      background: #3d2400;
+      border: 1px solid #8b6914;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant .bubble {
+      background: #2a1800;
+      border: 1px solid #5a3e10;
+      border-bottom-left-radius: 4px;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: #f0c060;
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 0.7s steps(1) infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .cited { font-size: 0.7rem; color: #8b6914; margin-top: 4px; }
+
+    #input-area {
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      border-top: 1px solid #3d2400;
+    }
+
+    #user-input {
+      flex: 1;
+      background: #2a1800;
+      border: 1px solid #8b6914;
+      border-radius: 12px;
+      color: #f5e6c8;
+      font-family: 'Georgia', serif;
+      font-size: 0.92rem;
+      padding: 10px 14px;
+      resize: none;
+      outline: none;
+      height: 46px;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    #user-input::placeholder { color: #6b4f20; }
+    #user-input:focus { border-color: #f0c060; }
+
+    #send-btn {
+      background: #8b6914;
+      border: none;
+      border-radius: 12px;
+      color: #1a0f00;
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 0 16px;
+      transition: background 0.2s;
+    }
+
+    #send-btn:hover { background: #f0c060; }
+    #send-btn:disabled { background: #3d2a00; cursor: not-allowed; }
+
+    #empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #6b4f20;
+      text-align: center;
+    }
+
+    #empty-state .om { font-size: 2.5rem; color: #8b6914; }
+    #empty-state p { font-size: 0.85rem; line-height: 1.6; max-width: 300px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🪔 Vandana AI</h1>
+  <p>Ancient wisdom for modern life — rooted in the Bhagavad Gita</p>
+</header>
+
+<div id="main">
+
+  <!-- Avatar Panel -->
+  <div id="avatar-panel">
+    <video id="avatar-video" autoplay playsinline></video>
+    <div id="avatar-placeholder">
+      <div class="om">ॐ</div>
+      <span>Vandana</span>
+    </div>
+    <button id="unmute-btn" style="display:none; background:#8b6914; border:none; border-radius:8px; color:#1a0f00; padding:6px 14px; cursor:pointer; font-size:0.8rem;">🔊 Tap to hear</button>
+    <div id="avatar-status">Ask Vandana anything</div>
+    <select id="lang-select" title="Language">
+      <option value="en">🇬🇧 English</option>
+      <option value="hi">🇮🇳 Hindi</option>
+    </select>
+    <button id="mic-btn" title="Hold to speak">🎤</button>
+  </div>
+
+  <!-- Chat Panel -->
+  <div id="chat-panel">
+    <div id="chat-container">
+      <div id="empty-state">
+        <div class="om">ॐ</div>
+        <p>Share what is weighing on your heart.<br>Vandana will offer guidance from the Bhagavad Gita.</p>
+      </div>
+    </div>
+
+    <div id="input-area">
+      <textarea id="user-input" placeholder="Ask Vandana anything..." rows="1"></textarea>
+      <button id="send-btn" title="Send">➤</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const chatContainer = document.getElementById('chat-container');
+  const userInput = document.getElementById('user-input');
+  const sendBtn = document.getElementById('send-btn');
+  const micBtn = document.getElementById('mic-btn');
+  const avatarVideo = document.getElementById('avatar-video');
+  const avatarPlaceholder = document.getElementById('avatar-placeholder');
+  const avatarStatus = document.getElementById('avatar-status');
+  const unmuteBtn = document.getElementById('unmute-btn');
+  const langSelect = document.getElementById('lang-select');
+  const emptyState = document.getElementById('empty-state');
+
+  const API_BASE = window.location.origin;
+
+  let conversationId = null;
+  let isBusy = false;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let currentAudio = null;
+  let audioQueue = [];
+
+  // ── Helpers ──────────────────────────────────────────
+
+  function setStatus(text) { avatarStatus.textContent = text; }
+
+  function setBusy(busy) {
+    isBusy = busy;
+    sendBtn.disabled = busy;
+    micBtn.disabled = busy;
+    userInput.disabled = busy;
+  }
+
+  function appendMessage(role, text = '') {
+    if (emptyState && emptyState.parentElement) emptyState.remove();
+    const wrapper = document.createElement('div');
+    wrapper.className = `message ${role}`;
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = role === 'user' ? 'You' : 'Vandana';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrapper.appendChild(label);
+    wrapper.appendChild(bubble);
+    chatContainer.appendChild(wrapper);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    return bubble;
+  }
+
+  function playAudioChunks(chunks) {
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    audioQueue = [...chunks];
+    playNextChunk();
+  }
+
+  function playNextChunk() {
+    if (audioQueue.length === 0) {
+      setStatus('Ask Vandana anything');
+      return;
+    }
+    const base64Wav = audioQueue.shift();
+    const binary = atob(base64Wav);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'audio/wav' });
+    const url = URL.createObjectURL(blob);
+    currentAudio = new Audio(url);
+    currentAudio.play().catch(console.error);
+    currentAudio.onended = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      playNextChunk();
+    };
+  }
+
+  function playAvatarVideo(mp4Url) {
+    avatarVideo.src = mp4Url;
+    avatarVideo.muted = false;
+    avatarVideo.style.display = 'block';
+    avatarPlaceholder.style.display = 'none';
+
+    const playPromise = avatarVideo.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        // Autoplay with audio blocked — play muted and show unmute button
+        avatarVideo.muted = true;
+        avatarVideo.play();
+        unmuteBtn.style.display = 'block';
+        unmuteBtn.onclick = () => {
+          avatarVideo.muted = false;
+          unmuteBtn.style.display = 'none';
+        };
+      });
+    }
+
+    avatarVideo.onended = () => {
+      avatarVideo.style.display = 'none';
+      avatarPlaceholder.style.display = 'flex';
+      unmuteBtn.style.display = 'none';
+      setStatus('Ask Vandana anything');
+    };
+  }
+
+  // ── Text chat with streaming + avatar ────────────────
+
+  async function sendMessage() {
+    const message = userInput.value.trim();
+    if (!message || isBusy) return;
+
+    setBusy(true);
+    userInput.value = '';
+    userInput.style.height = '46px';
+    appendMessage('user', message);
+
+    const bubble = appendMessage('assistant');
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    bubble.appendChild(cursor);
+    setStatus('Thinking...');
+
+    let fullText = '';
+    let cited = [];
+
+    try {
+      // Stream the text response
+      const lang = langSelect.value;
+      const response = await fetch(`${API_BASE}/chat/stream`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, conversation_id: conversationId, language_code: lang }),
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const lines = decoder.decode(value).split('\n').filter(l => l.startsWith('data: '));
+        for (const line of lines) {
+          const data = JSON.parse(line.slice(6));
+          if (data.type === 'meta') {
+            conversationId = data.conversation_id;
+            cited = data.cited_verses || [];
+          } else if (data.type === 'chunk') {
+            cursor.remove();
+            bubble.textContent += data.content;
+            fullText += data.content;
+            bubble.appendChild(cursor);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+          } else if (data.type === 'done') {
+            cursor.remove();
+            if (cited.length > 0) {
+              const citedEl = document.createElement('div');
+              citedEl.className = 'cited';
+              citedEl.textContent = `📖 ${cited.length} verse(s) referenced`;
+              bubble.parentElement.appendChild(citedEl);
+            }
+          }
+        }
+      }
+
+      // Generate avatar video from the full response
+      setStatus('Generating avatar response...');
+      const avatarResp = await fetch(`${API_BASE}/avatar/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, conversation_id: conversationId, language_code: lang }),
+      });
+      const avatarData = await avatarResp.json();
+      if (avatarData.audio_chunks?.length) {
+        setStatus('Speaking...');
+        playAudioChunks(avatarData.audio_chunks);
+      }
+      if (avatarData.video?.mp4_url) {
+        const proxied = `${API_BASE}/avatar/proxy-video?url=${encodeURIComponent(avatarData.video.mp4_url)}`;
+        playAvatarVideo(proxied);
+      }
+
+    } catch (err) {
+      cursor.remove();
+      bubble.textContent = 'Something went wrong. Please try again.';
+      setStatus('Error');
+      console.error(err);
+    }
+
+    setBusy(false);
+    userInput.focus();
+  }
+
+  // ── Voice input ──────────────────────────────────────
+
+  micBtn.addEventListener('mousedown', startRecording);
+  micBtn.addEventListener('mouseup', stopRecording);
+  micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+  micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+
+  async function startRecording() {
+    if (isBusy) return;
+    audioChunks = [];
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.start();
+    micBtn.classList.add('recording');
+    setStatus('Listening...');
+  }
+
+  async function stopRecording() {
+    if (!mediaRecorder) return;
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    micBtn.classList.remove('recording');
+
+    mediaRecorder.onstop = async () => {
+      setBusy(true);
+      setStatus('Transcribing...');
+
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'voice.webm');
+      if (conversationId) formData.append('conversation_id', conversationId);
+      formData.append('language_code', langSelect.value);
+
+      try {
+        const resp = await fetch(`${API_BASE}/avatar/voice`, {
+          method: 'POST',
+          body: formData,
+        });
+        const data = await resp.json();
+
+        appendMessage('user', data.transcript);
+        appendMessage('assistant', data.message.content);
+        conversationId = data.conversation_id;
+
+        if (data.audio_chunks?.length) {
+          setStatus('Speaking...');
+          playAudioChunks(data.audio_chunks);
+        }
+        if (data.video?.mp4_url) {
+          const proxied = `${API_BASE}/avatar/proxy-video?url=${encodeURIComponent(data.video.mp4_url)}`;
+          playAvatarVideo(proxied);
+        }
+      } catch (err) {
+        setStatus('Error processing voice');
+        console.error(err);
+      }
+
+      setBusy(false);
+    };
+  }
+
+  // ── Event listeners ──────────────────────────────────
+
+  sendBtn.addEventListener('click', sendMessage);
+
+  userInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  userInput.addEventListener('input', () => {
+    userInput.style.height = '46px';
+    userInput.style.height = Math.min(userInput.scrollHeight, 120) + 'px';
+  });
+</script>
+
+</body>
+</html>
