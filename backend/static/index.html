@@ -51,32 +51,40 @@
       gap: 16px;
     }
 
-    #avatar-video {
+    #visualizer-wrap {
+      position: relative;
+      width: 260px;
+      height: 260px;
+    }
+
+    #visualizer-canvas {
+      position: absolute;
+      top: 0; left: 0;
       width: 260px;
       height: 260px;
       border-radius: 50%;
-      object-fit: cover;
-      border: 3px solid #8b6914;
-      background: #2a1800;
-      display: none;
     }
 
-    #avatar-placeholder {
-      width: 260px;
-      height: 260px;
-      border-radius: 50%;
-      background: #2a1800;
-      border: 3px solid #5a3e10;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      color: #6b4f20;
+    #om-center {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 5rem;
+      color: #f0c060;
+      text-shadow: 0 0 30px #f0c06088, 0 0 60px #f0c06044;
+      transition: text-shadow 0.3s;
+      user-select: none;
+      pointer-events: none;
     }
 
-    #avatar-placeholder .om { font-size: 4rem; color: #8b6914; }
-    #avatar-placeholder span { font-size: 0.8rem; }
+    #om-center.speaking {
+      animation: om-glow 1.2s ease-in-out infinite alternate;
+    }
+
+    @keyframes om-glow {
+      from { text-shadow: 0 0 20px #f0c06088, 0 0 40px #f0c06044; }
+      to   { text-shadow: 0 0 50px #f0c060cc, 0 0 90px #f0c06088, 0 0 120px #f0c06044; }
+    }
 
     #avatar-status {
       font-size: 0.78rem;
@@ -247,12 +255,10 @@
 
   <!-- Avatar Panel -->
   <div id="avatar-panel">
-    <video id="avatar-video" autoplay playsinline></video>
-    <div id="avatar-placeholder">
-      <div class="om">ॐ</div>
-      <span>Vandana</span>
+    <div id="visualizer-wrap">
+      <canvas id="visualizer-canvas" width="260" height="260"></canvas>
+      <div id="om-center">ॐ</div>
     </div>
-    <button id="unmute-btn" style="display:none; background:#8b6914; border:none; border-radius:8px; color:#1a0f00; padding:6px 14px; cursor:pointer; font-size:0.8rem;">🔊 Tap to hear</button>
     <div id="avatar-status">Ask Vandana anything</div>
     <select id="lang-select" title="Language">
       <option value="en">🇬🇧 English</option>
@@ -283,12 +289,12 @@
   const userInput = document.getElementById('user-input');
   const sendBtn = document.getElementById('send-btn');
   const micBtn = document.getElementById('mic-btn');
-  const avatarVideo = document.getElementById('avatar-video');
-  const avatarPlaceholder = document.getElementById('avatar-placeholder');
   const avatarStatus = document.getElementById('avatar-status');
-  const unmuteBtn = document.getElementById('unmute-btn');
   const langSelect = document.getElementById('lang-select');
   const emptyState = document.getElementById('empty-state');
+  const canvas = document.getElementById('visualizer-canvas');
+  const omCenter = document.getElementById('om-center');
+  const ctx = canvas.getContext('2d');
 
   const API_BASE = window.location.origin;
 
@@ -298,6 +304,89 @@
   let audioChunks = [];
   let currentAudio = null;
   let audioQueue = [];
+
+  // ── Web Audio visualizer ──────────────────────────────
+  let audioCtx = null;
+  let analyser = null;
+  let vizFrame = null;
+  const connectedSources = new WeakSet();
+
+  function getAudioContext() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  function startVisualizer(audioEl) {
+    const ac = getAudioContext();
+    if (ac.state === 'suspended') ac.resume();
+    if (!analyser) {
+      analyser = ac.createAnalyser();
+      analyser.fftSize = 128;
+      analyser.connect(ac.destination);
+    }
+    if (!connectedSources.has(audioEl)) {
+      const source = ac.createMediaElementSource(audioEl);
+      source.connect(analyser);
+      connectedSources.add(audioEl);
+    }
+    omCenter.classList.add('speaking');
+    cancelAnimationFrame(vizFrame);
+    drawVisualizer();
+  }
+
+  function stopVisualizer() {
+    omCenter.classList.remove('speaking');
+    cancelAnimationFrame(vizFrame);
+    ctx.clearRect(0, 0, 260, 260);
+    drawIdle();
+  }
+
+  function drawIdle() {
+    ctx.clearRect(0, 0, 260, 260);
+    ctx.beginPath();
+    ctx.arc(130, 130, 120, 0, Math.PI * 2);
+    ctx.strokeStyle = '#5a3e1088';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawVisualizer() {
+    vizFrame = requestAnimationFrame(drawVisualizer);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+
+    ctx.clearRect(0, 0, 260, 260);
+
+    const cx = 130, cy = 130, radius = 90;
+    const bars = data.length;
+    const barMaxH = 36;
+
+    for (let i = 0; i < bars; i++) {
+      const angle = (i / bars) * Math.PI * 2 - Math.PI / 2;
+      const barH = (data[i] / 255) * barMaxH;
+      const x1 = cx + Math.cos(angle) * radius;
+      const y1 = cy + Math.sin(angle) * radius;
+      const x2 = cx + Math.cos(angle) * (radius + barH);
+      const y2 = cy + Math.sin(angle) * (radius + barH);
+
+      const alpha = 0.5 + (data[i] / 255) * 0.5;
+      ctx.strokeStyle = `rgba(240, 192, 96, ${alpha})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    // Soft inner ring
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius - 2, 0, Math.PI * 2);
+    ctx.strokeStyle = '#8b691433';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  drawIdle();
 
   // ── Helpers ──────────────────────────────────────────
 
@@ -335,6 +424,7 @@
 
   function playNextChunk() {
     if (audioQueue.length === 0) {
+      stopVisualizer();
       setStatus('Ask Vandana anything');
       return;
     }
@@ -345,39 +435,12 @@
     const blob = new Blob([bytes], { type: 'audio/wav' });
     const url = URL.createObjectURL(blob);
     currentAudio = new Audio(url);
+    startVisualizer(currentAudio);
     currentAudio.play().catch(console.error);
     currentAudio.onended = () => {
       URL.revokeObjectURL(url);
       currentAudio = null;
       playNextChunk();
-    };
-  }
-
-  function playAvatarVideo(mp4Url) {
-    avatarVideo.src = mp4Url;
-    avatarVideo.muted = false;
-    avatarVideo.style.display = 'block';
-    avatarPlaceholder.style.display = 'none';
-
-    const playPromise = avatarVideo.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // Autoplay with audio blocked — play muted and show unmute button
-        avatarVideo.muted = true;
-        avatarVideo.play();
-        unmuteBtn.style.display = 'block';
-        unmuteBtn.onclick = () => {
-          avatarVideo.muted = false;
-          unmuteBtn.style.display = 'none';
-        };
-      });
-    }
-
-    avatarVideo.onended = () => {
-      avatarVideo.style.display = 'none';
-      avatarPlaceholder.style.display = 'flex';
-      unmuteBtn.style.display = 'none';
-      setStatus('Ask Vandana anything');
     };
   }
 
@@ -440,8 +503,8 @@
         }
       }
 
-      // Generate avatar video from the full response
-      setStatus('Generating avatar response...');
+      // Generate audio for the response
+      setStatus('Speaking...');
       const avatarResp = await fetch(`${API_BASE}/avatar/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -449,12 +512,7 @@
       });
       const avatarData = await avatarResp.json();
       if (avatarData.audio_chunks?.length) {
-        setStatus('Speaking...');
         playAudioChunks(avatarData.audio_chunks);
-      }
-      if (avatarData.video?.mp4_url) {
-        const proxied = `${API_BASE}/avatar/proxy-video?url=${encodeURIComponent(avatarData.video.mp4_url)}`;
-        playAvatarVideo(proxied);
       }
 
     } catch (err) {
@@ -502,31 +560,52 @@
       if (conversationId) formData.append('conversation_id', conversationId);
       formData.append('language_code', langSelect.value);
 
+      let assistantBubble = null;
       try {
-        const resp = await fetch(`${API_BASE}/avatar/voice`, {
+        const resp = await fetch(`${API_BASE}/avatar/voice/stream`, {
           method: 'POST',
           body: formData,
         });
-        const data = await resp.json();
 
-        appendMessage('user', data.transcript);
-        appendMessage('assistant', data.message.content);
-        conversationId = data.conversation_id;
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-        if (data.audio_chunks?.length) {
-          setStatus('Speaking...');
-          playAudioChunks(data.audio_chunks);
-        }
-        if (data.video?.mp4_url) {
-          const proxied = `${API_BASE}/avatar/proxy-video?url=${encodeURIComponent(data.video.mp4_url)}`;
-          playAvatarVideo(proxied);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'meta') {
+              appendMessage('user', data.transcript);
+              assistantBubble = appendMessage('assistant', '…');
+              conversationId = data.conversation_id;
+              setStatus('Speaking...');
+              setBusy(false);
+            } else if (data.type === 'audio') {
+              // Play each chunk as it arrives
+              audioQueue.push(data.chunk);
+              if (!currentAudio) playNextChunk();
+            } else if (data.type === 'done') {
+              if (assistantBubble) {
+                assistantBubble.textContent = data.message || assistantBubble.textContent;
+                assistantBubble = null;
+              }
+              if (audioQueue.length === 0 && !currentAudio) setStatus('Ask Vandana anything');
+            }
+          }
         }
       } catch (err) {
         setStatus('Error processing voice');
         console.error(err);
+        setBusy(false);
       }
-
-      setBusy(false);
     };
   }
 

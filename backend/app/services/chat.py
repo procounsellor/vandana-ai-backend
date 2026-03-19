@@ -23,19 +23,21 @@ LANGUAGE_NAMES = {
     "pa": "Punjabi",
 }
 
-BASE_SYSTEM_PROMPT = """You are Vandana, a spiritual guide rooted in the Bhagavad Gita.
+BASE_SYSTEM_PROMPT = """You are Vandana, a warm and wise spiritual guide rooted in the Bhagavad Gita. You speak like a caring elder — naturally, warmly, and conversationally.
 
-When a user shares a problem, respond in this exact structure — keep it short and spoken naturally:
+For greetings, small talk, clarifications, or follow-up questions: respond warmly and briefly in plain conversational language. No verse needed.
 
-1. The complete verse in Sanskrit (include both lines of the shloka).
+When a user shares a problem, struggle, or asks for spiritual guidance: respond with:
+1. The complete verse in Sanskrit (both lines of the shloka).
 2. Its simple meaning in one sentence.
 3. Two to three sentences of practical guidance connecting the verse to their situation.
+Always end spiritual responses with "राधे राधे!" in an enthusiastic, joyful tone.
 
-Do not greet, do not repeat the user's question, do not give lengthy explanations. Get straight to the verse and its wisdom. Always end your response with "राधे राधे!" in an enthusiastic, joyful tone.
+Remember the conversation history and refer back to what was said earlier when relevant.
 
 IMPORTANT: Plain prose only. No markdown, no bold, no asterisks, no lists, no headers. Write as if speaking aloud.
 
-You MUST respond entirely in {language}. Do not use any other language for the explanation or guidance."""
+You MUST respond entirely in {language}."""
 
 
 def get_system_prompt(language_code: str = "en") -> str:
@@ -58,10 +60,7 @@ def build_verse_context(verses: list[Verse], language_code: str = "en") -> str:
             continue
 
         part = (
-            f"Bhagavad Gita Chapter {verse.chapter}, Verse {verse.verse_number}\n"
-            f"Sanskrit: {verse.sanskrit}\n"
-            f"Transliteration: {verse.transliteration}\n"
-            f"Translation: {translation}"
+            f"BG {verse.chapter}.{verse.verse_number} — {verse.sanskrit} — {translation}"
         )
         context_parts.append(part)
 
@@ -102,6 +101,9 @@ def chat(
         db.add(conversation)
         db.flush()
 
+    # Capture history BEFORE adding current user message to avoid duplication
+    history = get_conversation_history(conversation)
+
     # Save user message
     user_msg = Message(
         conversation_id=conversation.id,
@@ -112,12 +114,11 @@ def chat(
     db.flush()
 
     # Search for relevant verses
-    relevant_verses = search_verses(user_message, db, language_code=language_code, top_k=3)
+    relevant_verses = search_verses(user_message, db, language_code=language_code, top_k=2)
     verse_context = build_verse_context(relevant_verses, language_code=language_code)
     cited_verse_ids = [str(v.id) for v in relevant_verses]
 
     # Build messages for OpenAI
-    history = get_conversation_history(conversation)
     messages = [
         {"role": "system", "content": get_system_prompt(language_code)},
         {
@@ -177,6 +178,9 @@ def chat_stream(
         db.add(conversation)
         db.flush()
 
+    # Capture history BEFORE adding current user message to avoid duplication
+    history = get_conversation_history(conversation)
+
     # Save user message
     user_msg = Message(
         conversation_id=conversation.id,
@@ -187,7 +191,7 @@ def chat_stream(
     db.flush()
 
     # Search for relevant verses
-    relevant_verses = search_verses(user_message, db, language_code=language_code, top_k=3)
+    relevant_verses = search_verses(user_message, db, language_code=language_code, top_k=2)
     verse_context = build_verse_context(relevant_verses, language_code=language_code)
     cited_verse_ids = [str(v.id) for v in relevant_verses]
 
@@ -195,7 +199,6 @@ def chat_stream(
     yield f"data: {json.dumps({'type': 'meta', 'conversation_id': str(conversation.id), 'cited_verses': cited_verse_ids})}\n\n"
 
     # Build messages for OpenAI
-    history = get_conversation_history(conversation)
     messages = [
         {"role": "system", "content": get_system_prompt(language_code)},
         {"role": "system", "content": f"Relevant verses from the Bhagavad Gita:\n\n{verse_context}"},

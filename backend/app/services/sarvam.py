@@ -1,11 +1,8 @@
 import base64
-import io
 import re
-import tempfile
-import os
 import requests
-from concurrent.futures import ThreadPoolExecutor
-from pydub import AudioSegment
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Generator
 from app.config import SARVAM_API_KEY
 
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
@@ -27,18 +24,17 @@ LANGUAGE_MAP = {
 
 TTS_MODEL = "bulbul:v2"
 
-# bulbul:v2 female speakers
 TTS_SPEAKERS = {
-    "en": "anushka",
-    "hi": "anushka",
-    "te": "anushka",
-    "ta": "anushka",
-    "kn": "anushka",
-    "ml": "anushka",
-    "gu": "anushka",
-    "mr": "anushka",
-    "bn": "anushka",
-    "pa": "anushka",
+    "en": "abhilash",
+    "hi": "abhilash",
+    "te": "abhilash",
+    "ta": "abhilash",
+    "kn": "abhilash",
+    "ml": "abhilash",
+    "gu": "abhilash",
+    "mr": "abhilash",
+    "bn": "abhilash",
+    "pa": "abhilash",
 }
 
 
@@ -137,60 +133,75 @@ def _tts_chunk(text: str, sarvam_lang: str, speaker: str) -> bytes:
     return base64.b64decode(response.json()["audios"][0])
 
 
-def text_to_speech(text: str, language_code: str = "en") -> list[bytes]:
+def text_to_speech_stream(text: str, language_code: str = "en") -> Generator[bytes, None, None]:
     """
-    Convert text to speech using Sarvam AI.
-    Returns a list of WAV byte chunks (one per TTS call).
-    Caller is responsible for playing them sequentially.
+    Convert text to speech, yielding each WAV chunk as soon as it is ready (in order).
+    All Sarvam calls run in parallel; chunks are yielded in original text order.
     """
     sarvam_lang = LANGUAGE_MAP.get(language_code, "en-IN")
     speaker = TTS_SPEAKERS.get(language_code, "anushka")
     text = _clean_for_tts(text)
     chunks = _split_text(text)
 
-    print(f"TTS: {len(chunks)} chunks, chars={[len(c) for c in chunks]}, bytes={[len(c.encode('utf-8')) for c in chunks]}")
+    print(f"TTS: {len(chunks)} chunks, bytes={[len(c.encode('utf-8')) for c in chunks]}")
     for i, c in enumerate(chunks):
         print(f"  Chunk {i+1}: {c[:80]}...")
 
-    wav_chunks = []
-    for i, chunk in enumerate(chunks):
-        print(f"  Processing chunk {i+1}/{len(chunks)}...")
-        wav_bytes = _tts_chunk(chunk, sarvam_lang, speaker)
-        if wav_bytes:
-            wav_chunks.append(wav_bytes)
-            print(f"  Chunk {i+1} done, {len(wav_bytes)} bytes")
-        else:
-            print(f"  Chunk {i+1} skipped (empty after cleaning)")
+    if not chunks:
+        return
 
-    return wav_chunks
+    pending: dict[int, bytes] = {}
+    next_idx = 0
+
+    with ThreadPoolExecutor(max_workers=min(len(chunks), 6)) as executor:
+        future_to_idx = {executor.submit(_tts_chunk, chunk, sarvam_lang, speaker): i
+                         for i, chunk in enumerate(chunks)}
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            wav = future.result()
+            if wav:
+                pending[idx] = wav
+                print(f"  Chunk {idx+1} ready, {len(wav)} bytes")
+            # Yield consecutive ready chunks in order
+            while next_idx in pending:
+                yield pending.pop(next_idx)
+                next_idx += 1
+
+    # Yield any remaining (shouldn't happen, but safety)
+    while next_idx in pending:
+        yield pending.pop(next_idx)
+        next_idx += 1
 
 
-def speech_to_text(audio_bytes: bytes, filename: str = "audio.wav", language_code: str = "en") -> str:
+def text_to_speech(text: str, language_code: str = "en") -> list[bytes]:
+    """Convenience wrapper — collects all streamed chunks into a list."""
+    return list(text_to_speech_stream(text, language_code))
+
+
+_MIME_MAP = {
+    "wav": "audio/wav",
+    "mp3": "audio/mpeg",
+    "webm": "audio/webm",
+    "ogg": "audio/ogg",
+    "m4a": "audio/mp4",
+    "flac": "audio/flac",
+}
+
+
+def speech_to_text(audio_bytes: bytes, filename: str = "audio.webm", language_code: str = "en") -> str:
     """
     Convert speech to text using Sarvam AI.
+    Sends audio directly without conversion — Sarvam accepts WebM/WAV/MP3/OGG natively.
     Returns the transcript string.
     """
     sarvam_lang = LANGUAGE_MAP.get(language_code, "en-IN")
-
-    # Convert to WAV (16kHz mono) using a temp file — pydub needs seekable file
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "webm"
-    with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp_in:
-        tmp_in.write(audio_bytes)
-        tmp_in_path = tmp_in.name
-
-    try:
-        audio = AudioSegment.from_file(tmp_in_path, format=ext)
-        audio = audio.set_frame_rate(16000).set_channels(1)
-        wav_buffer = io.BytesIO()
-        audio.export(wav_buffer, format="wav")
-        wav_bytes = wav_buffer.getvalue()
-    finally:
-        os.unlink(tmp_in_path)
+    mime = _MIME_MAP.get(ext, "audio/webm")
 
     response = requests.post(
         SARVAM_STT_URL,
         headers={"api-subscription-key": SARVAM_API_KEY},
-        files={"file": ("audio.wav", wav_bytes, "audio/wav")},
+        files={"file": (filename, audio_bytes, mime)},
         data={
             "model": "saarika:v2.5",
             "language_code": sarvam_lang,

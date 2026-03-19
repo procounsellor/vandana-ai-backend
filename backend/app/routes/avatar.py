@@ -1,18 +1,31 @@
 import base64
+import json
+import re
+from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
+from openai import OpenAI
 from sqlalchemy.orm import Session
-import requests as req
 
+from app.config import OPENAI_API_KEY
 from app.db import SessionLocal
+from app.models import Conversation, Message
+from app.models.message import MessageRole
 from app.schemas.message import ChatRequest, MessageResponse
-from app.services.chat import chat
-from app.services.sarvam import text_to_speech, speech_to_text
-from app.services.simli import generate_avatar_video
-
+from app.services.chat import chat, build_verse_context, get_conversation_history, get_system_prompt
+from app.services.embedding import get_embedding
+from app.services.search import search_verses, search_verses_by_embedding
+from app.services.sarvam import (
+    text_to_speech, text_to_speech_stream, speech_to_text,
+    _clean_for_tts, _tts_chunk, LANGUAGE_MAP, TTS_SPEAKERS,
+)
 router = APIRouter(prefix="/avatar", tags=["avatar"])
 
 TEMP_USER_ID = "00000000-0000-0000-0000-000000000001"
+_openai = OpenAI(api_key=OPENAI_API_KEY)
+
+# Sentence boundary: ., ।, ॥, ?, ! followed by whitespace
+_SENTENCE_END = re.compile(r'[.।॥?!]\s+')
 
 
 def get_db():
@@ -21,28 +34,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-@router.get("/proxy-video")
-def proxy_video(url: str):
-    """Proxy Simli video to avoid CORS issues in the browser."""
-    response = req.get(url, stream=True, timeout=30)
-    if not response.ok:
-        raise HTTPException(status_code=response.status_code, detail="Video not found")
-    return StreamingResponse(
-        response.iter_content(chunk_size=8192),
-        media_type="video/mp4",
-        headers={"Cache-Control": "no-cache"},
-    )
-
-
-def try_generate_avatar(audio_bytes: bytes) -> dict:
-    """Generate avatar video, returning empty dict if Simli fails (rate limit, etc.)."""
-    try:
-        return generate_avatar_video(audio_bytes)
-    except Exception as e:
-        print(f"Simli avatar skipped: {e}")
-        return {}
 
 
 @router.post("/chat")
@@ -59,27 +50,27 @@ def avatar_chat(request: ChatRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=str(e))
 
     audio_chunks = text_to_speech(message.content, language_code=request.language_code)
-    video_urls = try_generate_avatar(audio_chunks[0])
 
     return {
         "conversation_id": str(conversation.id),
         "message": MessageResponse.model_validate(message),
         "audio_chunks": [base64.b64encode(c).decode("utf-8") for c in audio_chunks],
-        "video": {
-            "mp4_url": video_urls.get("mp4_url"),
-            "hls_url": video_urls.get("hls_url"),
-        },
     }
 
 
-@router.post("/voice")
-async def avatar_voice_chat(
+@router.post("/voice/stream")
+async def avatar_voice_stream(
     audio: UploadFile = File(...),
     conversation_id: str = Form(None),
     language_code: str = Form("en"),
     db: Session = Depends(get_db),
 ):
-    # Transcribe user voice
+    """
+    Pipelined voice endpoint:
+      STT → GPT stream → TTS per sentence (parallel) → SSE audio chunks
+    Audio starts playing as soon as the first sentence is synthesised,
+    while GPT is still generating the rest of the response.
+    """
     audio_bytes = await audio.read()
     try:
         user_text = speech_to_text(audio_bytes, filename=audio.filename, language_code=language_code)
@@ -89,27 +80,117 @@ async def avatar_voice_chat(
     if not user_text:
         raise HTTPException(status_code=400, detail="Could not transcribe audio")
 
-    try:
-        conversation, message = chat(
-            user_message=user_text,
-            db=db,
-            user_id=TEMP_USER_ID,
-            conversation_id=conversation_id,
-            language_code=language_code,
+    # Fire embedding call immediately in background — runs while we do DB setup
+    with ThreadPoolExecutor(max_workers=1) as embed_pool:
+        embed_future = embed_pool.submit(get_embedding, user_text)
+
+        # DB setup runs in parallel with embedding
+        if conversation_id:
+            conversation = db.query(Conversation).filter_by(id=conversation_id, user_id=TEMP_USER_ID).first()
+            if not conversation:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+        else:
+            conversation = Conversation(user_id=TEMP_USER_ID, language_code=language_code)
+            db.add(conversation)
+            db.flush()
+
+        # Capture history BEFORE adding current user message to avoid duplication
+        history = get_conversation_history(conversation)
+
+        user_msg = Message(conversation_id=conversation.id, role=MessageRole.user, content=user_text)
+        db.add(user_msg)
+        db.flush()
+
+        # Embedding should be ready by now (or very close)
+        query_embedding = embed_future.result()
+
+    relevant_verses = search_verses_by_embedding(query_embedding, db, top_k=2)
+    verse_context = build_verse_context(relevant_verses, language_code=language_code)
+    cited_verse_ids = [str(v.id) for v in relevant_verses]
+
+    gpt_messages = [
+        {"role": "system", "content": get_system_prompt(language_code)},
+        {"role": "system", "content": f"Relevant verses from the Bhagavad Gita:\n\n{verse_context}"},
+        *history,
+        {"role": "user", "content": user_text},
+    ]
+
+    sarvam_lang = LANGUAGE_MAP.get(language_code, "en-IN")
+    speaker = TTS_SPEAKERS.get(language_code, "anushka")
+    conv_id = str(conversation.id)
+
+    def generate():
+        yield f"data: {json.dumps({'type': 'meta', 'transcript': user_text, 'conversation_id': conv_id})}\n\n"
+
+        full_content = []
+        buffer = ""
+        pending: dict[int, object] = {}
+        submitted = 0
+        yielded = 0
+
+        def submit_sentence(text: str):
+            nonlocal submitted
+            clean = _clean_for_tts(text).strip()
+            if clean:
+                idx = submitted
+                submitted += 1
+                pending[idx] = tts_pool.submit(_tts_chunk, clean, sarvam_lang, speaker)
+
+        def flush_ready():
+            nonlocal yielded
+            while yielded in pending and pending[yielded].done():
+                wav = pending.pop(yielded).result()
+                yielded += 1
+                if wav:
+                    yield f"data: {json.dumps({'type': 'audio', 'chunk': base64.b64encode(wav).decode('utf-8')})}\n\n"
+
+        with ThreadPoolExecutor(max_workers=6) as tts_pool:
+            gpt_stream = _openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=gpt_messages,
+                temperature=0.7,
+                stream=True,
+            )
+
+            for token in gpt_stream:
+                delta = token.choices[0].delta.content or ""
+                full_content.append(delta)
+                buffer += delta
+
+                # Submit TTS for each complete sentence as GPT produces it
+                while True:
+                    m = _SENTENCE_END.search(buffer)
+                    if not m:
+                        break
+                    submit_sentence(buffer[:m.end()])
+                    buffer = buffer[m.end():]
+
+                yield from flush_ready()
+
+            # Flush remaining buffer (last sentence may not end with punctuation)
+            if buffer.strip():
+                submit_sentence(buffer.strip())
+
+            # Drain remaining TTS futures in order
+            for i in range(yielded, submitted):
+                if i in pending:
+                    wav = pending[i].result()
+                    if wav:
+                        yield f"data: {json.dumps({'type': 'audio', 'chunk': base64.b64encode(wav).decode('utf-8')})}\n\n"
+
+        # Save full response to DB
+        assistant_content = "".join(full_content)
+        if not conversation.title:
+            conversation.title = user_text[:60] + ("..." if len(user_text) > 60 else "")
+        assistant_msg = Message(
+            conversation_id=conversation.id,
+            role=MessageRole.assistant,
+            content=assistant_content,
+            cited_verses=cited_verse_ids,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        db.add(assistant_msg)
+        db.commit()
 
-    audio_chunks = text_to_speech(message.content, language_code=language_code)
-    video_urls = try_generate_avatar(audio_chunks[0])
+        yield f"data: {json.dumps({'type': 'done', 'message': assistant_content})}\n\n"
 
-    return {
-        "conversation_id": str(conversation.id),
-        "transcript": user_text,
-        "message": MessageResponse.model_validate(message),
-        "audio_chunks": [base64.b64encode(c).decode("utf-8") for c in audio_chunks],
-        "video": {
-            "mp4_url": video_urls.get("mp4_url"),
-            "hls_url": video_urls.get("hls_url"),
-        },
-    }
+    return StreamingResponse(generate(), media_type="text/event-stream")
