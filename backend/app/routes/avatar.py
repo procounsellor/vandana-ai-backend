@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import OPENAI_API_KEY
 from app.db import SessionLocal
+from app.dependencies import get_current_user_id
 from app.models import Conversation, Message
 from app.models.message import MessageRole
 from app.schemas.message import ChatRequest, MessageResponse
@@ -21,7 +22,6 @@ from app.services.sarvam import (
 )
 router = APIRouter(prefix="/avatar", tags=["avatar"])
 
-TEMP_USER_ID = "00000000-0000-0000-0000-000000000001"
 _openai = OpenAI(api_key=OPENAI_API_KEY)
 
 # Sentence boundary: ., ।, ॥, ?, ! followed by whitespace
@@ -37,12 +37,16 @@ def get_db():
 
 
 @router.post("/chat")
-def avatar_chat(request: ChatRequest, db: Session = Depends(get_db)):
+def avatar_chat(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
     try:
         conversation, message = chat(
             user_message=request.message,
             db=db,
-            user_id=TEMP_USER_ID,
+            user_id=user_id,
             conversation_id=str(request.conversation_id) if request.conversation_id else None,
             language_code=request.language_code,
         )
@@ -64,6 +68,7 @@ async def avatar_voice_stream(
     conversation_id: str = Form(None),
     language_code: str = Form("en"),
     db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Pipelined voice endpoint:
@@ -86,11 +91,11 @@ async def avatar_voice_stream(
 
         # DB setup runs in parallel with embedding
         if conversation_id:
-            conversation = db.query(Conversation).filter_by(id=conversation_id, user_id=TEMP_USER_ID).first()
+            conversation = db.query(Conversation).filter_by(id=conversation_id, user_id=user_id).first()
             if not conversation:
                 raise HTTPException(status_code=404, detail="Conversation not found")
         else:
-            conversation = Conversation(user_id=TEMP_USER_ID, language_code=language_code)
+            conversation = Conversation(user_id=user_id, language_code=language_code)
             db.add(conversation)
             db.flush()
 

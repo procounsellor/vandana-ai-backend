@@ -1,8 +1,12 @@
 import base64
+import io
 import re
+import wave
 import requests
+import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Generator
+from pedalboard import Pedalboard, Reverb, Delay, HighShelfFilter
 from app.config import SARVAM_API_KEY
 
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
@@ -108,8 +112,39 @@ def _is_shloka(text: str) -> bool:
     return not bool(re.search(r'[a-zA-Z]', text)) and bool(re.search(r'[\u0900-\u097F]', text))
 
 
+def apply_temple_effects(wav_bytes: bytes) -> bytes:
+    """Apply reverb, echo, EQ, and gentle slowdown to give a temple/godly feel."""
+    # Read WAV
+    with wave.open(io.BytesIO(wav_bytes)) as wf:
+        sr = wf.getframerate()
+        frames = wf.readframes(wf.getnframes())
+
+    # Convert int16 → float32 [-1, 1]
+    audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+
+    # Effects chain — new instance per call (Reverb/Delay are stateful)
+    board = Pedalboard([
+        HighShelfFilter(cutoff_frequency_hz=6000, gain_db=-2),   # gentle high trim
+        Reverb(room_size=0.45, damping=0.55, wet_level=0.25, dry_level=0.75),  # temple space
+        Delay(delay_seconds=0.08, feedback=0.15, mix=0.08),      # subtle echo
+    ])
+    processed = board(audio, sr)
+    processed = np.clip(processed, -1.0, 1.0)
+    audio_int16 = (processed * 32767).astype(np.int16)
+
+    # Very gentle slowdown (0.97x) — just a touch slower, minimal pitch shift
+    out_sr = int(sr * 0.97)
+    out = io.BytesIO()
+    with wave.open(out, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(out_sr)
+        wf.writeframes(audio_int16.tobytes())
+    return out.getvalue()
+
+
 def _tts_chunk(text: str, sarvam_lang: str, speaker: str) -> bytes:
-    """Call Sarvam TTS for a single chunk and return WAV bytes."""
+    """Call Sarvam TTS for a single chunk and return processed WAV bytes."""
     if not text.strip():
         return b''
     pace = 0.75 if _is_shloka(text) else 0.9
@@ -130,7 +165,8 @@ def _tts_chunk(text: str, sarvam_lang: str, speaker: str) -> bytes:
     if not response.ok:
         print(f"Sarvam TTS error {response.status_code}: {response.text}")
         response.raise_for_status()
-    return base64.b64decode(response.json()["audios"][0])
+    raw_wav = base64.b64decode(response.json()["audios"][0])
+    return apply_temple_effects(raw_wav)
 
 
 def text_to_speech_stream(text: str, language_code: str = "en") -> Generator[bytes, None, None]:

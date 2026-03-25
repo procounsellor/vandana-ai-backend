@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vandana AI</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -242,14 +243,232 @@
 
     #empty-state .om { font-size: 2.5rem; color: #8b6914; }
     #empty-state p { font-size: 0.85rem; line-height: 1.6; max-width: 300px; }
+
+    /* ── History Sidebar ── */
+    #history-sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      width: 280px;
+      background: #1e1200;
+      border-right: 1px solid #3d2400;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(-100%);
+      transition: transform 0.28s ease;
+    }
+
+    #history-sidebar.open { transform: translateX(0); }
+
+    #history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      border-bottom: 1px solid #3d2400;
+    }
+
+    #history-header h3 { font-size: 0.9rem; color: #f0c060; letter-spacing: 1px; }
+
+    #history-close {
+      background: none;
+      border: none;
+      color: #8b6914;
+      font-size: 1.2rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    #new-chat-btn {
+      margin: 12px;
+      padding: 10px;
+      background: #3d2400;
+      border: 1px solid #8b6914;
+      border-radius: 10px;
+      color: #f0c060;
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s;
+    }
+    #new-chat-btn:hover { background: #4d3000; }
+
+    #history-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      gap: 8px;
+      transition: background 0.15s;
+    }
+
+    .history-item:hover { background: #2d1a00; }
+    .history-item.active { background: #3d2400; }
+
+    .history-item-text { flex: 1; min-width: 0; }
+    .history-item-title {
+      font-size: 0.82rem;
+      color: #f5e6c8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .history-item-date { font-size: 0.68rem; color: #6b4f20; margin-top: 2px; }
+
+    .history-delete {
+      background: none;
+      border: none;
+      color: #3d2400;
+      font-size: 0.9rem;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+    }
+    .history-item:hover .history-delete { opacity: 1; }
+    .history-delete:hover { color: #ff6b6b; }
+
+    #history-empty {
+      text-align: center;
+      color: #6b4f20;
+      font-size: 0.8rem;
+      padding: 32px 16px;
+    }
+
+    #history-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 49;
+    }
+    #history-overlay.open { display: block; }
+
+    #history-toggle {
+      background: none;
+      border: none;
+      color: #8b6914;
+      font-size: 1.3rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: color 0.2s;
+    }
+    #history-toggle:hover { color: #f0c060; }
+
+    /* ── Auth ── */
+    #user-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: #c8a96e;
+    }
+
+    #user-info img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid #8b6914;
+    }
+
+    #login-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #login-modal-overlay.visible { display: flex; }
+
+    #login-modal {
+      background: #2a1800;
+      border: 1px solid #8b6914;
+      border-radius: 20px;
+      padding: 36px 32px;
+      text-align: center;
+      max-width: 340px;
+      width: 90%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    #login-modal .om { font-size: 2.5rem; color: #f0c060; }
+    #login-modal h2 { font-size: 1.2rem; color: #f0c060; }
+    #login-modal p { font-size: 0.85rem; color: #c8a96e; line-height: 1.6; }
+
+    #google-signin-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #fff;
+      color: #333;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+      margin-top: 4px;
+    }
+
+    #google-signin-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+    #google-signin-btn img { width: 20px; height: 20px; }
   </style>
 </head>
 <body>
 
-<header>
+<!-- History Sidebar -->
+<div id="history-overlay"></div>
+<div id="history-sidebar">
+  <div id="history-header">
+    <h3>☰ Conversations</h3>
+    <button id="history-close">✕</button>
+  </div>
+  <button id="new-chat-btn">✦ New conversation</button>
+  <div id="history-list">
+    <div id="history-empty">Sign in to see your conversation history</div>
+  </div>
+</div>
+
+<header style="position:relative;">
+  <div style="position:absolute;top:50%;left:16px;transform:translateY(-50%);">
+    <button id="history-toggle" title="Conversation history">☰</button>
+  </div>
   <h1>🪔 Vandana AI</h1>
   <p>Ancient wisdom for modern life — rooted in the Bhagavad Gita</p>
+  <div id="user-info" style="position:absolute;top:50%;right:16px;transform:translateY(-50%);"></div>
 </header>
+
+<!-- Login Modal -->
+<div id="login-modal-overlay">
+  <div id="login-modal">
+    <div class="om">ॐ</div>
+    <h2>Continue your journey</h2>
+    <p>You've had 5 conversations with Vandana.<br>Sign in to continue receiving guidance.</p>
+    <button id="google-signin-btn">
+      <img src="https://www.google.com/favicon.ico" alt="Google" />
+      Sign in with Google
+    </button>
+  </div>
+</div>
 
 <div id="main">
 
@@ -295,8 +514,12 @@
   const canvas = document.getElementById('visualizer-canvas');
   const omCenter = document.getElementById('om-center');
   const ctx = canvas.getContext('2d');
+  const userInfoEl = document.getElementById('user-info');
+  const loginModal = document.getElementById('login-modal-overlay');
+  const googleSigninBtn = document.getElementById('google-signin-btn');
 
   const API_BASE = window.location.origin;
+  const GUEST_CHAT_LIMIT = 3;
 
   let conversationId = null;
   let isBusy = false;
@@ -304,6 +527,210 @@
   let audioChunks = [];
   let currentAudio = null;
   let audioQueue = [];
+
+  // ── Auth ──────────────────────────────────────────────
+
+  let authToken = localStorage.getItem('vandana_token') || null;
+  let currentUser = JSON.parse(localStorage.getItem('vandana_user') || 'null');
+  let guestChatCount = parseInt(localStorage.getItem('vandana_guest_count') || '0');
+
+  function getAuthHeaders() {
+    return authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
+  }
+
+  function isLoggedIn() { return !!authToken; }
+
+  function renderUserInfo() {
+    if (currentUser) {
+      userInfoEl.innerHTML = `
+        ${currentUser.picture ? `<img src="${currentUser.picture}" alt="" referrerpolicy="no-referrer" />` : ''}
+        <span>${currentUser.name?.split(' ')[0] || 'User'}</span>
+      `;
+    } else {
+      userInfoEl.innerHTML = `<span style="color:#6b4f20;font-size:0.75rem;">${GUEST_CHAT_LIMIT - guestChatCount} free chats left</span>`;
+    }
+  }
+
+  function checkGuestLimit() {
+    if (!isLoggedIn() && guestChatCount >= GUEST_CHAT_LIMIT) {
+      loginModal.classList.add('visible');
+      return false;
+    }
+    return true;
+  }
+
+  function incrementGuestCount() {
+    if (!isLoggedIn()) {
+      guestChatCount++;
+      localStorage.setItem('vandana_guest_count', guestChatCount);
+      renderUserInfo();
+    }
+  }
+
+  function onLoginSuccess(token, user) {
+    authToken = token;
+    currentUser = user;
+    localStorage.setItem('vandana_token', token);
+    localStorage.setItem('vandana_user', JSON.stringify(user));
+    loginModal.classList.remove('visible');
+    renderUserInfo();
+    loadHistory();
+  }
+
+  // Google One Tap / popup sign-in
+  function initGoogle() {
+    if (!window.google) return;
+    google.accounts.id.initialize({
+      client_id: window.__GOOGLE_CLIENT_ID__ || '',
+      callback: async (response) => {
+        const res = await fetch(`${API_BASE}/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id_token: response.credential }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          onLoginSuccess(data.token, data.user);
+        }
+      },
+    });
+  }
+
+  googleSigninBtn.addEventListener('click', () => {
+    if (window.google) {
+      google.accounts.id.prompt();
+    } else {
+      alert('Google Sign-In is not available. Please add your GOOGLE_CLIENT_ID.');
+    }
+  });
+
+  window.addEventListener('load', () => {
+    initGoogle();
+    renderUserInfo();
+    if (isLoggedIn()) loadHistory();
+  });
+  document.addEventListener('google-loaded', initGoogle);
+
+  // ── History Sidebar ───────────────────────────────────
+
+  const historySidebar = document.getElementById('history-sidebar');
+  const historyOverlay = document.getElementById('history-overlay');
+  const historyList = document.getElementById('history-list');
+  const historyEmpty = document.getElementById('history-empty');
+  const historyToggle = document.getElementById('history-toggle');
+  const historyClose = document.getElementById('history-close');
+  const newChatBtn = document.getElementById('new-chat-btn');
+
+  let historyData = [];
+
+  function openHistory() {
+    historySidebar.classList.add('open');
+    historyOverlay.classList.add('open');
+    if (isLoggedIn()) loadHistory();
+  }
+
+  function closeHistory() {
+    historySidebar.classList.remove('open');
+    historyOverlay.classList.remove('open');
+  }
+
+  historyToggle.addEventListener('click', openHistory);
+  historyClose.addEventListener('click', closeHistory);
+  historyOverlay.addEventListener('click', closeHistory);
+
+  newChatBtn.addEventListener('click', () => {
+    conversationId = null;
+    chatContainer.innerHTML = '';
+    chatContainer.appendChild(createEmptyState());
+    closeHistory();
+    userInput.focus();
+  });
+
+  function createEmptyState() {
+    const div = document.createElement('div');
+    div.id = 'empty-state';
+    div.innerHTML = `<div class="om">ॐ</div><p>Share what is weighing on your heart.<br>Vandana will offer guidance from the Bhagavad Gita.</p>`;
+    return div;
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now - d;
+    if (diff < 86400000) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (diff < 604800000) return d.toLocaleDateString([], { weekday: 'short' });
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  async function loadHistory() {
+    if (!isLoggedIn()) {
+      historyEmpty.textContent = 'Sign in to see your conversation history';
+      historyEmpty.style.display = 'block';
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/conversations`, { headers: getAuthHeaders() });
+      historyData = await res.json();
+      renderHistory();
+    } catch (e) { console.error(e); }
+  }
+
+  function renderHistory() {
+    historyList.innerHTML = '';
+    if (!historyData.length) {
+      historyList.appendChild(Object.assign(document.createElement('div'), {
+        id: 'history-empty', textContent: 'No conversations yet'
+      }));
+      return;
+    }
+    historyData.forEach(conv => {
+      const item = document.createElement('div');
+      item.className = 'history-item' + (conv.id === conversationId ? ' active' : '');
+      item.dataset.id = conv.id;
+      item.innerHTML = `
+        <div class="history-item-text">
+          <div class="history-item-title">${conv.title}</div>
+          <div class="history-item-date">${formatDate(conv.updated_at)}</div>
+        </div>
+        <button class="history-delete" title="Delete" data-id="${conv.id}">🗑</button>
+      `;
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.history-delete')) return;
+        loadConversation(conv.id);
+        closeHistory();
+      });
+      item.querySelector('.history-delete').addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteConversation(conv.id);
+      });
+      historyList.appendChild(item);
+    });
+  }
+
+  async function loadConversation(id) {
+    try {
+      const res = await fetch(`${API_BASE}/conversations/${id}`, { headers: getAuthHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      conversationId = data.id;
+      chatContainer.innerHTML = '';
+      data.messages.forEach(m => appendMessage(m.role, m.content));
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    } catch (e) { console.error(e); }
+  }
+
+  async function deleteConversation(id) {
+    try {
+      await fetch(`${API_BASE}/conversations/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      if (conversationId === id) {
+        conversationId = null;
+        chatContainer.innerHTML = '';
+        chatContainer.appendChild(createEmptyState());
+      }
+      historyData = historyData.filter(c => c.id !== id);
+      renderHistory();
+    } catch (e) { console.error(e); }
+  }
 
   // ── Web Audio visualizer ──────────────────────────────
   let audioCtx = null;
@@ -358,20 +785,24 @@
     ctx.clearRect(0, 0, 260, 260);
 
     const cx = 130, cy = 130, radius = 90;
-    const bars = data.length;
+    const bins = data.length;       // 64 bins
+    const total = bins * 2;         // 128 slots — mirror left/right for full circle
     const barMaxH = 36;
 
-    for (let i = 0; i < bars; i++) {
-      const angle = (i / bars) * Math.PI * 2 - Math.PI / 2;
-      const barH = (data[i] / 255) * barMaxH;
+    for (let i = 0; i < total; i++) {
+      // Mirror: right half uses bins 0→63, left half uses bins 63→0
+      const binIdx = i < bins ? i : total - 1 - i;
+      const angle = (i / total) * Math.PI * 2 - Math.PI / 2;
+      const barH = (data[binIdx] / 255) * barMaxH;
+
       const x1 = cx + Math.cos(angle) * radius;
       const y1 = cy + Math.sin(angle) * radius;
       const x2 = cx + Math.cos(angle) * (radius + barH);
       const y2 = cy + Math.sin(angle) * (radius + barH);
 
-      const alpha = 0.5 + (data[i] / 255) * 0.5;
+      const alpha = 0.4 + (data[binIdx] / 255) * 0.6;
       ctx.strokeStyle = `rgba(240, 192, 96, ${alpha})`;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
@@ -449,6 +880,7 @@
   async function sendMessage() {
     const message = userInput.value.trim();
     if (!message || isBusy) return;
+    if (!checkGuestLimit()) return;
 
     setBusy(true);
     userInput.value = '';
@@ -469,7 +901,7 @@
       const lang = langSelect.value;
       const response = await fetch(`${API_BASE}/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ message, conversation_id: conversationId, language_code: lang }),
       });
 
@@ -503,11 +935,12 @@
         }
       }
 
+      incrementGuestCount();
       // Generate audio for the response
       setStatus('Speaking...');
       const avatarResp = await fetch(`${API_BASE}/avatar/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ message, conversation_id: conversationId, language_code: lang }),
       });
       const avatarData = await avatarResp.json();
@@ -524,6 +957,7 @@
 
     setBusy(false);
     userInput.focus();
+    if (isLoggedIn()) loadHistory();
   }
 
   // ── Voice input ──────────────────────────────────────
@@ -535,6 +969,7 @@
 
   async function startRecording() {
     if (isBusy) return;
+    if (!checkGuestLimit()) return;
     audioChunks = [];
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
@@ -564,6 +999,7 @@
       try {
         const resp = await fetch(`${API_BASE}/avatar/voice/stream`, {
           method: 'POST',
+          headers: { ...getAuthHeaders() },
           body: formData,
         });
 
@@ -586,6 +1022,7 @@
               appendMessage('user', data.transcript);
               assistantBubble = appendMessage('assistant', '…');
               conversationId = data.conversation_id;
+              incrementGuestCount();
               setStatus('Speaking...');
               setBusy(false);
             } else if (data.type === 'audio') {
@@ -598,6 +1035,7 @@
                 assistantBubble = null;
               }
               if (audioQueue.length === 0 && !currentAudio) setStatus('Ask Vandana anything');
+              if (isLoggedIn()) loadHistory();
             }
           }
         }

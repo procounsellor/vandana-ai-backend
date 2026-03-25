@@ -3,6 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
+from app.dependencies import get_current_user_id
 from app.schemas.message import ChatRequest, ChatResponse, MessageResponse
 from app.services.chat import chat, chat_stream
 
@@ -18,15 +19,16 @@ def get_db():
 
 
 @router.post("", response_model=ChatResponse)
-def send_message(request: ChatRequest, db: Session = Depends(get_db)):
-    # TODO: Replace hardcoded user_id with authenticated user once auth is built
-    TEMP_USER_ID = "00000000-0000-0000-0000-000000000001"
-
+def send_message(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
     try:
         conversation, message = chat(
             user_message=request.message,
             db=db,
-            user_id=TEMP_USER_ID,
+            user_id=user_id,
             conversation_id=str(request.conversation_id) if request.conversation_id else None,
             language_code=request.language_code,
         )
@@ -40,15 +42,16 @@ def send_message(request: ChatRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/stream")
-def send_message_stream(request: ChatRequest, db: Session = Depends(get_db)):
-    # TODO: Replace hardcoded user_id with authenticated user once auth is built
-    TEMP_USER_ID = "00000000-0000-0000-0000-000000000001"
-
+def send_message_stream(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
     try:
         generator = chat_stream(
             user_message=request.message,
             db=db,
-            user_id=TEMP_USER_ID,
+            user_id=user_id,
             conversation_id=str(request.conversation_id) if request.conversation_id else None,
             language_code=request.language_code,
         )
