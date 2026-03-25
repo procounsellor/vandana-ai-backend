@@ -50,13 +50,13 @@ jobs:
 
       - name: Create env vars file
         run: |
-          cat > /tmp/env-vars.yaml << 'ENVEOF'
-          DATABASE_URL: "${{ secrets.DATABASE_URL }}"
-          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
-          SARVAM_API_KEY: "${{ secrets.SARVAM_API_KEY }}"
-          GOOGLE_CLIENT_ID: "${{ secrets.GOOGLE_CLIENT_ID }}"
-          JWT_SECRET: "${{ secrets.JWT_SECRET }}"
-          ENVEOF
+          printf 'DATABASE_URL: "%s"\nOPENAI_API_KEY: "%s"\nSARVAM_API_KEY: "%s"\nGOOGLE_CLIENT_ID: "%s"\nJWT_SECRET: "%s"\n' \
+            "${{ secrets.DATABASE_URL }}" \
+            "${{ secrets.OPENAI_API_KEY }}" \
+            "${{ secrets.SARVAM_API_KEY }}" \
+            "${{ secrets.GOOGLE_CLIENT_ID }}" \
+            "${{ secrets.JWT_SECRET }}" \
+            > /tmp/env-vars.yaml
 
       - name: Deploy to Cloud Run
         run: |
