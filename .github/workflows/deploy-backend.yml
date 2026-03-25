@@ -48,6 +48,16 @@ jobs:
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/vandana-ai-repo/${{ env.SERVICE }}:${{ github.sha }}
           docker push ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/vandana-ai-repo/${{ env.SERVICE }}:latest
 
+      - name: Create env vars file
+        run: |
+          cat > /tmp/env-vars.yaml << 'ENVEOF'
+          DATABASE_URL: "${{ secrets.DATABASE_URL }}"
+          OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}"
+          SARVAM_API_KEY: "${{ secrets.SARVAM_API_KEY }}"
+          GOOGLE_CLIENT_ID: "${{ secrets.GOOGLE_CLIENT_ID }}"
+          JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+          ENVEOF
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE }} \
@@ -55,12 +65,8 @@ jobs:
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --add-cloudsql-instances ${{ secrets.CLOUD_SQL_CONNECTION_NAME }} \
-            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-            --set-env-vars "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" \
-            --set-env-vars "SARVAM_API_KEY=${{ secrets.SARVAM_API_KEY }}" \
-            --set-env-vars "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" \
-            --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            --add-cloudsql-instances "${{ secrets.CLOUD_SQL_CONNECTION_NAME }}" \
+            --env-vars-file /tmp/env-vars.yaml \
             --min-instances 0 \
             --max-instances 10 \
             --memory 1Gi \
