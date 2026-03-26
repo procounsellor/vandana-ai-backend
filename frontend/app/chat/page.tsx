@@ -169,7 +169,7 @@ export default function ChatPage() {
             style={{ color: "#8b6914" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "#f0c060")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "#8b6914")}>
-            ← Home
+            Home
           </Link>
           <button onClick={() => setHistoryOpen(true)}
             className="text-xl transition-colors"
