@@ -163,13 +163,22 @@ export default function ChatPage() {
       {/* Header */}
       <header className="relative flex items-center justify-center px-4 py-3 shrink-0"
         style={{ background: "linear-gradient(180deg,#1e1200 0%,transparent 100%)", borderBottom: "1px solid #3d2400" }}>
-        <button onClick={() => setHistoryOpen(true)}
-          className="absolute left-4 text-xl transition-colors"
-          style={{ color: "#8b6914" }}
-          onMouseEnter={(e) => e.currentTarget.style.color = "#f0c060"}
-          onMouseLeave={(e) => e.currentTarget.style.color = "#8b6914"}>
-          ☰
-        </button>
+        <div className="absolute left-4 flex items-center gap-3">
+          <Link href="/"
+            className="text-sm transition-colors"
+            style={{ color: "#8b6914" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "#f0c060")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "#8b6914")}>
+            ← Home
+          </Link>
+          <button onClick={() => setHistoryOpen(true)}
+            className="text-xl transition-colors"
+            style={{ color: "#8b6914" }}
+            onMouseEnter={(e) => e.currentTarget.style.color = "#f0c060"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#8b6914"}>
+            ☰
+          </button>
+        </div>
         <Link href="/" className="text-center group">
           <h1 className="text-lg tracking-[3px] group-hover:opacity-80 transition-opacity" style={{ fontFamily: "var(--font-cinzel)", color: "#f0c060" }}>
             🪔 VANDANA AI
