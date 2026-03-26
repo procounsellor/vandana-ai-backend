@@ -1,0 +1,72 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-cinzel);
+  --font-mono: var(--font-geist-mono);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+:root {
+  --background: #0f0800;
+  --foreground: #f5e6c8;
+  --card: #1a0f00;
+  --card-foreground: #f5e6c8;
+  --popover: #1a0f00;
+  --popover-foreground: #f5e6c8;
+  --primary: #f0c060;
+  --primary-foreground: #0f0800;
+  --secondary: #2a1800;
+  --secondary-foreground: #f5e6c8;
+  --muted: #2a1800;
+  --muted-foreground: #8b6914;
+  --accent: #3d2400;
+  --accent-foreground: #f0c060;
+  --destructive: #dc2626;
+  --border: #3d2400;
+  --input: #2a1800;
+  --ring: #8b6914;
+  --radius: 0.75rem;
+
+  /* Custom spiritual tokens */
+  --saffron: #f0c060;
+  --saffron-dim: #8b6914;
+  --saffron-glow: #f0c06044;
+  --bg-deep: #0f0800;
+  --bg-card: #1a0f00;
+  --bg-elevated: #2a1800;
+  --border-subtle: #3d2400;
+  --border-glow: #8b6914;
+  --text-primary: #f5e6c8;
+  --text-secondary: #c8a96e;
+  --text-muted: #6b4f20;
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-inter), sans-serif;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3d2400; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #8b6914; }
