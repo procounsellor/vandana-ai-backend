@@ -174,7 +174,7 @@ function Hero() {
           className="text-4xl md:text-6xl mb-5 leading-tight"
           style={{ fontFamily: "var(--font-cormorant)", color: "#fff8ee", fontWeight: 300 }}>
           Seek guidance from<br />
-          <span style={{ color: SAFFRON, fontStyle: "italic" }}>the eternal Gita</span>
+          <span style={{ color: SAFFRON, fontStyle: "italic" }}>ancient Indian wisdom</span>
         </motion.h1>
 
         <motion.p
@@ -184,7 +184,7 @@ function Hero() {
           className="text-base leading-relaxed mb-10"
           style={{ color: WARM, fontFamily: "var(--font-cormorant)", fontSize: "1.15rem" }}>
           Vandana is your personal spiritual companion — voice-driven, multilingual,<br className="hidden md:block" />
-          and rooted in the timeless wisdom of the Bhagavad Gita.
+          and rooted in the timeless wisdom of the Bhagavad Gita, Yoga Sutras, Upanishads, and more.
         </motion.p>
 
         <motion.div
@@ -250,10 +250,10 @@ function About() {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}>
             <p className="leading-relaxed mb-6" style={{ fontFamily: "var(--font-cormorant)", color: WARM, fontSize: "1.15rem" }}>
-              Vandana — meaning <em style={{ color: SAFFRON }}>prayer</em> or <em style={{ color: SAFFRON }}>reverence</em> — is an AI spiritual guide that channels the wisdom of the Bhagavad Gita to help you navigate life's deepest questions.
+              Vandana — meaning <em style={{ color: SAFFRON }}>prayer</em> or <em style={{ color: SAFFRON }}>reverence</em> — is an AI spiritual guide that channels the wisdom of India's greatest scriptures to help you navigate life's deepest questions.
             </p>
             <p className="leading-relaxed" style={{ fontFamily: "var(--font-cormorant)", color: WARM, fontSize: "1.15rem" }}>
-              Whether you are facing uncertainty, seeking purpose, or simply curious about dharma, Vandana listens in your language and responds with guidance drawn directly from Lord Krishna's timeless teachings.
+              Whether you seek dharma from the Bhagavad Gita, clarity from the Upanishads, discipline from the Yoga Sutras, or strategy from Chanakya — Vandana listens in your language and responds with timeless guidance.
             </p>
           </motion.div>
 
@@ -276,8 +276,8 @@ function About() {
             {/* Stat cards */}
             <div className="grid grid-cols-3 gap-3 mt-4">
               {[
-                { num: "700+", label: "Gita Verses" },
-                { num: "2", label: "Languages" },
+                { num: "6", label: "Scriptures" },
+                { num: "1200+", label: "Verses" },
                 { num: "∞", label: "Wisdom" },
               ].map(({ num, label }) => (
                 <div key={label} className="flex flex-col items-center justify-center py-5 rounded-xl"
@@ -289,6 +289,66 @@ function About() {
             </div>
           </motion.div>
         </div>
+      </div>
+    </section>
+  );
+}
+
+const SCRIPTURES = [
+  { icon: "🕉️", name: "Bhagavad Gita", tagline: "Dharma, duty & liberation", short: "gita" },
+  { icon: "🧘", name: "Yoga Sutras", tagline: "The eight-limbed path", short: "yoga_sutras" },
+  { icon: "🔥", name: "Upanishads", tagline: "Brahman, Atman & moksha", short: "upanishads" },
+  { icon: "♟️", name: "Chanakya Neeti", tagline: "Ethics & practical wisdom", short: "chanakya_neeti" },
+  { icon: "⚖️", name: "Arthashastra", tagline: "Statecraft & strategy", short: "arthashastra" },
+  { icon: "🌸", name: "Kama Sutra", tagline: "The art of living well", short: "kama_sutra" },
+];
+
+function ScriptureShowcase() {
+  return (
+    <section className="relative py-20 px-6 overflow-hidden" style={{ background: PANEL }}>
+      <div className="relative max-w-5xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-12">
+          <p className="text-xs tracking-[5px] uppercase mb-4" style={{ color: GOLD, fontFamily: "var(--font-cinzel)" }}>Scriptures</p>
+          <h2 className="text-4xl md:text-5xl mb-4" style={{ fontFamily: "var(--font-cormorant)", color: "#fff8ee", fontWeight: 300 }}>
+            Six paths of ancient wisdom
+          </h2>
+          <Divider />
+        </motion.div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {SCRIPTURES.map((s, i) => (
+            <motion.div
+              key={s.short}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.07 }}
+              className="flex flex-col items-center text-center p-6 rounded-2xl"
+              style={{ background: DEEP, border: `1px solid ${BORDER}` }}>
+              <span className="text-4xl mb-3">{s.icon}</span>
+              <h3 className="text-sm tracking-wider mb-1" style={{ fontFamily: "var(--font-cinzel)", color: SAFFRON }}>{s.name}</h3>
+              <p className="text-xs leading-snug" style={{ color: GOLD }}>{s.tagline}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mt-10">
+          <Link href="/chat"
+            className="inline-flex items-center justify-center px-8 py-3 rounded-full text-xs tracking-widest uppercase transition-all duration-300"
+            style={{ background: SAFFRON, color: DEEP, fontFamily: "var(--font-cinzel)" }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "#f5d070"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = SAFFRON; }}>
+            Choose Your Scripture
+          </Link>
+        </motion.div>
       </div>
     </section>
   );
@@ -345,11 +405,11 @@ function TwoPaths() {
                   AI Spiritual Guide
                 </h3>
                 <p style={{ fontFamily: "var(--font-cormorant)", color: WARM, fontSize: "1.05rem", lineHeight: "1.7" }}>
-                  Speak or type your deepest questions. Vandana listens with the patience of a sage and responds with guidance from the Bhagavad Gita — in your language, in a voice that carries the essence of the divine.
+                  Speak or type your deepest questions. Vandana listens with the patience of a sage and responds with guidance from India's greatest scriptures — in your language, in a voice that carries the essence of the divine.
                 </p>
               </div>
               <ul className="space-y-2">
-                {["Voice & text conversation", "Multilingual (EN, HI)", "Gita verse citations", "Temple-resonant voice"].map((f) => (
+                {["Voice & text conversation", "Multilingual (EN, HI)", "6 ancient scriptures", "Temple-resonant voice"].map((f) => (
                   <li key={f} className="flex items-center gap-3 text-sm" style={{ color: WARM }}>
                     <span style={{ color: SAFFRON }}>✦</span> {f}
                   </li>
@@ -420,7 +480,7 @@ function TwoPaths() {
 function Features() {
   const features = [
     { icon: "🎙️", title: "Voice-First", desc: "Speak naturally and receive spoken guidance. Vandana's voice carries a temple-like resonance — reverb, warmth, and presence." },
-    { icon: "📖", title: "Rooted in the Gita", desc: "Every response is grounded in the 700 verses of the Bhagavad Gita, matched to your question through semantic vector search." },
+    { icon: "📖", title: "6 Sacred Scriptures", desc: "Choose from the Bhagavad Gita, Yoga Sutras, Upanishads, Chanakya Neeti, Arthashastra, or Kama Sutra — each with its own wisdom and persona." },
     { icon: "🌐", title: "Multilingual", desc: "Converse in English or Hindi. Vandana understands your language and responds in kind." },
     { icon: "💬", title: "Contextual", desc: "Vandana remembers your conversation, building a continuous dialogue rather than isolated responses." },
     { icon: "🔒", title: "Private & Secure", desc: "Sign in with Google to save your conversations. Guest access allows 3 free queries — no account required to begin." },
@@ -470,7 +530,7 @@ function Features() {
 function HowItWorks() {
   const steps = [
     { num: "01", title: "Open Vandana", desc: "Visit the AI Guide and speak or type your question — in English or Hindi." },
-    { num: "02", title: "Vandana Listens", desc: "Your voice is transcribed and matched against the Bhagavad Gita using semantic search." },
+    { num: "02", title: "Vandana Listens", desc: "Your voice is transcribed and matched against your chosen scripture using semantic vector search." },
     { num: "03", title: "Wisdom Arrives", desc: "A thoughtful response streams back to you — spoken in a temple-resonant voice." },
     { num: "04", title: "Continue the Journey", desc: "Build a lasting conversation. Sign in with Google to save your history and return whenever you need guidance." },
   ];
@@ -594,7 +654,7 @@ function Footer() {
         </div>
         <Divider />
         <p className="text-xs mt-6" style={{ color: "#4a3010" }}>
-          © {new Date().getFullYear()} Vandana AI · Rooted in the Bhagavad Gita
+          © {new Date().getFullYear()} Vandana AI · Rooted in ancient Indian wisdom
         </p>
       </div>
     </footer>
@@ -607,6 +667,7 @@ export default function HomePage() {
       <NavBar />
       <Hero />
       <About />
+      <ScriptureShowcase />
       <TwoPaths />
       <Features />
       <HowItWorks />

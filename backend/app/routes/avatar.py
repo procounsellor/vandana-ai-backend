@@ -118,7 +118,7 @@ async def avatar_voice_stream(
         query_embedding = embed_future.result()
 
     relevant_verses = search_verses_by_embedding(
-        query_embedding, db, top_k=2,
+        query_embedding, db, top_k=3,
         scripture_short_names=[scripture_short_name or "gita"],
     )
     verse_context = build_verse_context(relevant_verses, language_code=language_code, scripture_short_name=scripture_short_name)
@@ -167,6 +167,7 @@ async def avatar_voice_stream(
                 model="gpt-4o-mini",
                 messages=gpt_messages,
                 temperature=0.7,
+                max_tokens=600,
                 stream=True,
             )
 
