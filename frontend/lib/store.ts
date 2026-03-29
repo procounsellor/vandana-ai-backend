@@ -26,12 +26,14 @@ interface Store {
   messages: Message[];
   language: string;
   history: Conversation[];
+  scriptureShortName: string | null;
   setConversationId: (id: string | null) => void;
   addMessage: (msg: Message) => void;
   setMessages: (msgs: Message[]) => void;
   updateLastAssistant: (content: string) => void;
   setLanguage: (lang: string) => void;
   setHistory: (h: Conversation[]) => void;
+  setScripture: (s: string) => void;
   newConversation: () => void;
 
   // UI
@@ -57,6 +59,7 @@ export const useStore = create<Store>()(
       messages: [],
       language: "en",
       history: [],
+      scriptureShortName: null,
       setConversationId: (id) => set({ conversationId: id }),
       addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
       setMessages: (msgs) => set({ messages: msgs }),
@@ -70,7 +73,8 @@ export const useStore = create<Store>()(
         }),
       setLanguage: (language) => set({ language }),
       setHistory: (history) => set({ history }),
-      newConversation: () => set({ conversationId: null, messages: [] }),
+      setScripture: (scriptureShortName) => set({ scriptureShortName }),
+      newConversation: () => set({ conversationId: null, messages: [], scriptureShortName: null }),
 
       // UI
       showLoginModal: false,
@@ -78,7 +82,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: "vandana-store",
-      partialize: (s) => ({ token: s.token, user: s.user, guestCount: s.guestCount, language: s.language }),
+      partialize: (s) => ({ token: s.token, user: s.user, guestCount: s.guestCount, language: s.language, scriptureShortName: s.scriptureShortName }),
     }
   )
 );

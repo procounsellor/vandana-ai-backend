@@ -13,7 +13,7 @@ from app.dependencies import get_current_user_id
 from app.models import Conversation, Message
 from app.models.message import MessageRole
 from app.schemas.message import ChatRequest, MessageResponse
-from app.services.chat import chat, build_verse_context, get_conversation_history, get_system_prompt
+from app.services.chat import chat, build_verse_context, get_conversation_history, get_system_prompt, suggest_scripture
 from app.services.embedding import get_embedding
 from app.services.search import search_verses, search_verses_by_embedding
 from app.services.sarvam import (
@@ -49,6 +49,7 @@ def avatar_chat(
             user_id=user_id,
             conversation_id=str(request.conversation_id) if request.conversation_id else None,
             language_code=request.language_code,
+            scripture_short_name=request.scripture_short_name,
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -67,6 +68,7 @@ async def avatar_voice_stream(
     audio: UploadFile = File(...),
     conversation_id: str = Form(None),
     language_code: str = Form("en"),
+    scripture_short_name: str = Form(None),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
@@ -94,8 +96,14 @@ async def avatar_voice_stream(
             conversation = db.query(Conversation).filter_by(id=conversation_id, user_id=user_id).first()
             if not conversation:
                 raise HTTPException(status_code=404, detail="Conversation not found")
+            if not scripture_short_name:
+                scripture_short_name = conversation.scripture_short_name
         else:
-            conversation = Conversation(user_id=user_id, language_code=language_code)
+            conversation = Conversation(
+                user_id=user_id,
+                language_code=language_code,
+                scripture_short_name=scripture_short_name or "gita",
+            )
             db.add(conversation)
             db.flush()
 
@@ -109,13 +117,18 @@ async def avatar_voice_stream(
         # Embedding should be ready by now (or very close)
         query_embedding = embed_future.result()
 
-    relevant_verses = search_verses_by_embedding(query_embedding, db, top_k=2)
-    verse_context = build_verse_context(relevant_verses, language_code=language_code)
+    relevant_verses = search_verses_by_embedding(
+        query_embedding, db, top_k=2,
+        scripture_short_names=[scripture_short_name or "gita"],
+    )
+    verse_context = build_verse_context(relevant_verses, language_code=language_code, scripture_short_name=scripture_short_name)
     cited_verse_ids = [str(v.id) for v in relevant_verses]
 
+    from app.services.chat import get_scripture_config
+    config = get_scripture_config(scripture_short_name)
     gpt_messages = [
-        {"role": "system", "content": get_system_prompt(language_code)},
-        {"role": "system", "content": f"Relevant verses from the Bhagavad Gita:\n\n{verse_context}"},
+        {"role": "system", "content": get_system_prompt(language_code, scripture_short_name)},
+        {"role": "system", "content": f"Relevant passages from the {config['context_label']}:\n\n{verse_context}"},
         *history,
         {"role": "user", "content": user_text},
     ]
@@ -199,3 +212,34 @@ async def avatar_voice_stream(
         yield f"data: {json.dumps({'type': 'done', 'message': assistant_content})}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@router.get("/scriptures")
+def list_scriptures(db: Session = Depends(get_db)):
+    """List all available scriptures."""
+    from app.models import Scripture
+    from app.services.chat import SCRIPTURE_PROMPTS
+    scriptures = db.query(Scripture).all()
+    seeded = {s.short_name for s in scriptures}
+    return [
+        {
+            "short_name": key,
+            "name": val["name"],
+            "available": key in seeded,
+        }
+        for key, val in SCRIPTURE_PROMPTS.items()
+    ]
+
+
+@router.post("/suggest-scripture")
+def suggest_scripture_endpoint(body: dict):
+    """Suggest the best scripture for a user's message."""
+    message = body.get("message", "")
+    if not message:
+        return {"scripture_short_name": "gita"}
+    suggested = suggest_scripture(message)
+    from app.services.chat import SCRIPTURE_PROMPTS
+    return {
+        "scripture_short_name": suggested,
+        "name": SCRIPTURE_PROMPTS[suggested]["name"],
+    }

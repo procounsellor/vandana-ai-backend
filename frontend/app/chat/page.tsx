@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useStore } from "@/lib/store";
 import { voiceStream, fetchConversations } from "@/lib/api";
 import AvatarVisualizer from "@/components/AvatarVisualizer";
+import BookSelector from "@/components/BookSelector";
 import ChatPanel from "@/components/ChatPanel";
 import HistorySidebar from "@/components/HistorySidebar";
 import LoginModal from "@/components/LoginModal";
@@ -99,6 +100,7 @@ export default function ChatPage() {
     fd.append("audio", blob, "voice.webm");
     if (store.conversationId) fd.append("conversation_id", store.conversationId);
     fd.append("language_code", store.language);
+    if (store.scriptureShortName) fd.append("scripture_short_name", store.scriptureShortName);
 
     const tempId = Date.now().toString();
     try {
@@ -141,6 +143,7 @@ export default function ChatPage() {
           message: text,
           conversation_id: store.conversationId,
           language_code: store.language,
+          scripture_short_name: store.scriptureShortName,
         }),
       });
       const data = await res.json();
@@ -178,6 +181,18 @@ export default function ChatPage() {
             onMouseLeave={(e) => e.currentTarget.style.color = "#8b6914"}>
             ☰
           </button>
+          {store.scriptureShortName && (
+            <button
+              onClick={() => store.newConversation()}
+              className="text-[0.65rem] tracking-wider px-2 py-1 rounded-lg transition-all"
+              style={{ background: "#2a1800", border: "1px solid #3d2400", color: "#8b6914" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#8b6914"; e.currentTarget.style.color = "#f0c060"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#3d2400"; e.currentTarget.style.color = "#8b6914"; }}
+              title="Change scripture"
+            >
+              📖 Change
+            </button>
+          )}
         </div>
         <Link href="/" className="text-center group">
           <h1 className="text-lg tracking-[3px] group-hover:opacity-80 transition-opacity" style={{ fontFamily: "var(--font-cinzel)", color: "#f0c060" }}>
@@ -220,36 +235,42 @@ export default function ChatPage() {
 
       {/* Main */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Avatar panel — desktop only */}
-        <div className="hidden md:flex w-[280px] shrink-0 flex-col items-center justify-center gap-5 p-5"
-          style={{ borderRight: "1px solid #3d2400" }}>
-          <AvatarVisualizer isSpeaking={isSpeaking} analyserRef={analyserRef} />
-          <p className="text-xs tracking-widest transition-colors" style={{ color: isSpeaking ? "#f0c060" : "#6b4f20" }}>
-            {status || "Ask Vandana anything"}
-          </p>
-          <motion.button
-            onMouseDown={startRecording}
-            onMouseUp={stopRecording}
-            onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
-            onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
-            whileTap={{ scale: 0.92 }}
-            className="w-14 h-14 rounded-full flex items-center justify-center text-2xl"
-            style={{
-              background: isRecording ? "#8b0000" : "#2a1800",
-              border: `2px solid ${isRecording ? "#ff4444" : "#8b6914"}`,
-              color: "#f0c060",
-              boxShadow: isRecording ? "0 0 20px #ff000044" : "none",
-            }}
-          >
-            🎤
-          </motion.button>
-        </div>
+        {!store.scriptureShortName && store.messages.length === 0 ? (
+          <BookSelector onSelect={(s) => store.setScripture(s)} />
+        ) : (
+          <>
+            {/* Avatar panel — desktop only */}
+            <div className="hidden md:flex w-[280px] shrink-0 flex-col items-center justify-center gap-5 p-5"
+              style={{ borderRight: "1px solid #3d2400" }}>
+              <AvatarVisualizer isSpeaking={isSpeaking} analyserRef={analyserRef} />
+              <p className="text-xs tracking-widest transition-colors" style={{ color: isSpeaking ? "#f0c060" : "#6b4f20" }}>
+                {status || "Ask Vandana anything"}
+              </p>
+              <motion.button
+                onMouseDown={startRecording}
+                onMouseUp={stopRecording}
+                onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
+                onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
+                whileTap={{ scale: 0.92 }}
+                className="w-14 h-14 rounded-full flex items-center justify-center text-2xl"
+                style={{
+                  background: isRecording ? "#8b0000" : "#2a1800",
+                  border: `2px solid ${isRecording ? "#ff4444" : "#8b6914"}`,
+                  color: "#f0c060",
+                  boxShadow: isRecording ? "0 0 20px #ff000044" : "none",
+                }}
+              >
+                🎤
+              </motion.button>
+            </div>
 
-        <ChatPanel isTyping={isTyping} status={status} onSendText={handleSendText} />
+            <ChatPanel isTyping={isTyping} status={status} onSendText={handleSendText} />
+          </>
+        )}
       </div>
 
       {/* Mobile mic bar */}
-      <div className="md:hidden flex items-center justify-center py-3 shrink-0"
+      <div className={`${(!store.scriptureShortName && store.messages.length === 0) ? "hidden" : ""} md:hidden flex items-center justify-center py-3 shrink-0`}
         style={{ borderTop: "1px solid #3d2400" }}>
         <motion.button
           onMouseDown={startRecording} onMouseUp={stopRecording}

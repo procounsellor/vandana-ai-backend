@@ -5,9 +5,10 @@ from app.models.message import MessageRole
 
 
 class ChatRequest(BaseModel):
-    conversation_id: UUID | None = None   # None = start a new conversation
+    conversation_id: UUID | None = None
     message: str
     language_code: str = "en"
+    scripture_short_name: str | None = None
 
 
 class MessageResponse(BaseModel):

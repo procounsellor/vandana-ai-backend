@@ -10,8 +10,9 @@ class Conversation(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    title = Column(String, nullable=True)           # Auto-generated from first message
-    language_code = Column(String(10), nullable=False, default="en")  # Preferred language for this session
+    title = Column(String, nullable=True)
+    language_code = Column(String(10), nullable=False, default="en")
+    scripture_short_name = Column(String(50), nullable=True)  # e.g. "gita", "yoga_sutras"
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

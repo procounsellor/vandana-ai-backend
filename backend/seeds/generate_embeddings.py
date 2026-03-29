@@ -22,13 +22,14 @@ def get_verse_text(verse: Verse) -> str:
     """Build the text to embed for a verse."""
     parts = []
 
-    # Include translation for semantic meaning
-    for t in verse.translations:
-        if t.author == AUTHOR and t.language_code == "en":
-            parts.append(t.translation)
-            break
+    # Try preferred author first, fall back to any English translation
+    en_translation = next(
+        (t.translation for t in verse.translations if t.author == AUTHOR and t.language_code == "en"),
+        next((t.translation for t in verse.translations if t.language_code == "en"), None)
+    )
+    if en_translation:
+        parts.append(en_translation)
 
-    # Include transliteration for phonetic context
     if verse.transliteration:
         parts.append(verse.transliteration)
 

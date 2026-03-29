@@ -66,6 +66,23 @@ export function voiceStream(
   });
 }
 
+// ── Scriptures ──────────────────────────────────────────
+export async function fetchScriptures() {
+  const res = await fetch(`${API}/avatar/scriptures`);
+  if (!res.ok) return [];
+  return res.json() as Promise<Scripture[]>;
+}
+
+export async function suggestScripture(message: string) {
+  const res = await fetch(`${API}/avatar/suggest-scripture`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) return null;
+  return res.json() as Promise<{ scripture_short_name: string; name: string }>;
+}
+
 // ── Types ───────────────────────────────────────────────
 export interface AppUser {
   id: string;
@@ -90,4 +107,10 @@ export interface ConversationMessage {
 
 export interface ConversationDetail extends Conversation {
   messages: ConversationMessage[];
+}
+
+export interface Scripture {
+  short_name: string;
+  name: string;
+  available: boolean;
 }
