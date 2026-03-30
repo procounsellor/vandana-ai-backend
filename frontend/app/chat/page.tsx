@@ -71,25 +71,25 @@ export default function ChatPage() {
   }
 
   // ── Voice recording ────────────────────────────────────
-  async function startRecording() {
-    if (store.isGuestLimitReached()) { store.setShowLoginModal(true); return; }
-    recordingChunksRef.current = [];
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mr = new MediaRecorder(stream);
-    mr.ondataavailable = (e) => recordingChunksRef.current.push(e.data);
-    mr.start();
-    mediaRecorderRef.current = mr;
-    setIsRecording(true);
-    setStatus("Listening...");
-  }
-
-  function stopRecording() {
-    const mr = mediaRecorderRef.current;
-    if (!mr) return;
-    mr.stop();
-    mr.stream.getTracks().forEach((t) => t.stop());
-    setIsRecording(false);
-    mr.onstop = () => processVoice();
+  async function toggleRecording() {
+    if (isRecording) {
+      const mr = mediaRecorderRef.current;
+      if (!mr) return;
+      mr.stop();
+      mr.stream.getTracks().forEach((t) => t.stop());
+      setIsRecording(false);
+      mr.onstop = () => processVoice();
+    } else {
+      if (store.isGuestLimitReached()) { store.setShowLoginModal(true); return; }
+      recordingChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      mr.ondataavailable = (e) => recordingChunksRef.current.push(e.data);
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setIsRecording(true);
+      setStatus("Listening...");
+    }
   }
 
   async function processVoice() {
@@ -244,13 +244,10 @@ export default function ChatPage() {
               style={{ borderRight: "1px solid #3d2400" }}>
               <AvatarVisualizer isSpeaking={isSpeaking} analyserRef={analyserRef} />
               <p className="text-xs tracking-widest transition-colors" style={{ color: isSpeaking ? "#f0c060" : "#6b4f20" }}>
-                {status || "Ask Vandana anything"}
+                {status || (isRecording ? "Tap to stop" : "Tap to speak")}
               </p>
               <motion.button
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
-                onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
-                onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
+                onClick={toggleRecording}
                 whileTap={{ scale: 0.92 }}
                 className="w-14 h-14 rounded-full flex items-center justify-center text-2xl"
                 style={{
@@ -260,7 +257,7 @@ export default function ChatPage() {
                   boxShadow: isRecording ? "0 0 20px #ff000044" : "none",
                 }}
               >
-                🎤
+                {isRecording ? "⏹️" : "🎤"}
               </motion.button>
             </div>
 
@@ -273,9 +270,7 @@ export default function ChatPage() {
       <div className={`${(!store.scriptureShortName && store.messages.length === 0) ? "hidden" : ""} md:hidden flex items-center justify-center py-3 shrink-0`}
         style={{ borderTop: "1px solid #3d2400" }}>
         <motion.button
-          onMouseDown={startRecording} onMouseUp={stopRecording}
-          onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
-          onTouchEnd={(e) => { e.preventDefault(); stopRecording(); }}
+          onClick={toggleRecording}
           whileTap={{ scale: 0.92 }}
           className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
           style={{
@@ -284,7 +279,7 @@ export default function ChatPage() {
             color: "#f0c060",
           }}
         >
-          🎤
+          {isRecording ? "⏹️" : "🎤"}
         </motion.button>
       </div>
 
