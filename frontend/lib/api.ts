@@ -40,12 +40,19 @@ export function voiceStream(
   onAudio: (chunk: string) => void,
   onDone: (message: string) => void,
 ) {
-  return fetch(`${API}/avatar/voice/stream`, {
+  const url = `${API}/avatar/voice/stream`;
+  console.log("[voiceStream] POST", url, { hasToken: !!token });
+  return fetch(url, {
     method: "POST",
     headers: authHeaders(token),
     body: formData,
   }).then(async (res) => {
-    if (!res.ok) throw new Error("Voice stream failed");
+    console.log("[voiceStream] response", res.status, res.statusText);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(unreadable)");
+      console.error("[voiceStream] error body:", body);
+      throw new Error(`Voice stream failed: ${res.status} ${res.statusText} — ${body}`);
+    }
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -63,6 +70,9 @@ export function voiceStream(
         else if (data.type === "done") onDone(data.message ?? "");
       }
     }
+  }).catch((err) => {
+    console.error("[voiceStream] fetch failed:", err?.message ?? err);
+    throw err;
   });
 }
 
