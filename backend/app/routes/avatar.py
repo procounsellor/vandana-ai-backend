@@ -1,11 +1,14 @@
 import base64
 import json
+import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from openai import OpenAI
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.config import OPENAI_API_KEY
 from app.db import SessionLocal
@@ -79,12 +82,17 @@ async def avatar_voice_stream(
     while GPT is still generating the rest of the response.
     """
     audio_bytes = await audio.read()
+    logger.info("voice/stream request — user=%s audio_bytes=%d lang=%s scripture=%s conv=%s",
+                user_id, len(audio_bytes), language_code, scripture_short_name, conversation_id)
     try:
         user_text = speech_to_text(audio_bytes, filename=audio.filename, language_code=language_code)
+        logger.info("STT result — transcript=%r", user_text)
     except ValueError as e:
+        logger.error("STT failed: %s", e)
         raise HTTPException(status_code=400, detail=str(e))
 
     if not user_text:
+        logger.warning("STT returned empty transcript")
         raise HTTPException(status_code=400, detail="Could not transcribe audio")
 
     # Fire embedding call immediately in background — runs while we do DB setup

@@ -96,17 +96,20 @@ export default function ChatPage() {
     setStatus("Transcribing...");
     setIsTyping(true);
     const blob = new Blob(recordingChunksRef.current, { type: "audio/webm" });
+    console.log("[processVoice] blob size:", blob.size, "type:", blob.type);
     const fd = new FormData();
     fd.append("audio", blob, "voice.webm");
     if (store.conversationId) fd.append("conversation_id", store.conversationId);
     fd.append("language_code", store.language);
     if (store.scriptureShortName) fd.append("scripture_short_name", store.scriptureShortName);
+    console.log("[processVoice] sending — conversationId:", store.conversationId, "language:", store.language, "scripture:", store.scriptureShortName);
 
     const tempId = Date.now().toString();
     try {
       await voiceStream(
         fd, store.token,
         (transcript, convId) => {
+          console.log("[processVoice] meta received — transcript:", transcript, "convId:", convId);
           store.addMessage({ id: tempId, role: "user", content: transcript });
           store.addMessage({ id: tempId + "_a", role: "assistant", content: "…" });
           store.setConversationId(convId);
@@ -115,10 +118,13 @@ export default function ChatPage() {
           setStatus("Speaking...");
         },
         (chunk) => queueAudio(chunk),
-        (message) => store.updateLastAssistant(message),
+        (message) => {
+          console.log("[processVoice] done — message length:", message.length);
+          store.updateLastAssistant(message);
+        },
       );
     } catch (e) {
-      console.error(e);
+      console.error("[processVoice] error:", e);
       setStatus("Something went wrong");
       setIsTyping(false);
     }
