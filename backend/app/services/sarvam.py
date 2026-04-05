@@ -6,7 +6,7 @@ import requests
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Generator
-from pedalboard import Pedalboard, Reverb, Delay, HighShelfFilter
+from pedalboard import Pedalboard, Reverb, Delay, HighShelfFilter, PitchShift, HighpassFilter, LowpassFilter, Compressor, Gain
 from app.config import SARVAM_API_KEY
 
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
@@ -143,7 +143,36 @@ def apply_temple_effects(wav_bytes: bytes) -> bytes:
     return out.getvalue()
 
 
-def _tts_chunk(text: str, sarvam_lang: str, speaker: str) -> bytes:
+def apply_baby_ganesha_effects(wav_bytes: bytes) -> bytes:
+    """Apply child-like voice effects for Baby Ganesha — higher pitch, bright tone, gentle reverb."""
+    with wave.open(io.BytesIO(wav_bytes)) as wf:
+        sr = wf.getframerate()
+        frames = wf.readframes(wf.getnframes())
+
+    audio = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
+
+    board = Pedalboard([
+        PitchShift(semitones=3.5),
+        HighpassFilter(cutoff_frequency_hz=145),
+        LowpassFilter(cutoff_frequency_hz=7200),
+        Compressor(threshold_db=-20, ratio=2.5),
+        Gain(gain_db=2),
+        Reverb(room_size=0.18, damping=0.35, wet_level=0.08, dry_level=0.92),
+    ])
+    processed = board(audio, sr)
+    processed = np.clip(processed, -1.0, 1.0)
+    audio_int16 = (processed * 32767).astype(np.int16)
+
+    out = io.BytesIO()
+    with wave.open(out, 'wb') as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sr)
+        wf.writeframes(audio_int16.tobytes())
+    return out.getvalue()
+
+
+def _tts_chunk(text: str, sarvam_lang: str, speaker: str, scripture_short_name: str | None = None) -> bytes:
     """Call Sarvam TTS for a single chunk and return processed WAV bytes."""
     if not text.strip():
         return b''
@@ -166,16 +195,18 @@ def _tts_chunk(text: str, sarvam_lang: str, speaker: str) -> bytes:
         print(f"Sarvam TTS error {response.status_code}: {response.text}")
         response.raise_for_status()
     raw_wav = base64.b64decode(response.json()["audios"][0])
+    if scripture_short_name == "baby_ganesha":
+        return apply_baby_ganesha_effects(raw_wav)
     return apply_temple_effects(raw_wav)
 
 
-def text_to_speech_stream(text: str, language_code: str = "en") -> Generator[bytes, None, None]:
+def text_to_speech_stream(text: str, language_code: str = "en", scripture_short_name: str | None = None) -> Generator[bytes, None, None]:
     """
     Convert text to speech, yielding each WAV chunk as soon as it is ready (in order).
     All Sarvam calls run in parallel; chunks are yielded in original text order.
     """
     sarvam_lang = LANGUAGE_MAP.get(language_code, "en-IN")
-    speaker = TTS_SPEAKERS.get(language_code, "anushka")
+    speaker = "anushka" if scripture_short_name == "baby_ganesha" else TTS_SPEAKERS.get(language_code, "anushka")
     text = _clean_for_tts(text)
     chunks = _split_text(text)
 
@@ -190,7 +221,7 @@ def text_to_speech_stream(text: str, language_code: str = "en") -> Generator[byt
     next_idx = 0
 
     with ThreadPoolExecutor(max_workers=min(len(chunks), 6)) as executor:
-        future_to_idx = {executor.submit(_tts_chunk, chunk, sarvam_lang, speaker): i
+        future_to_idx = {executor.submit(_tts_chunk, chunk, sarvam_lang, speaker, scripture_short_name): i
                          for i, chunk in enumerate(chunks)}
         for future in as_completed(future_to_idx):
             idx = future_to_idx[future]
@@ -209,9 +240,9 @@ def text_to_speech_stream(text: str, language_code: str = "en") -> Generator[byt
         next_idx += 1
 
 
-def text_to_speech(text: str, language_code: str = "en") -> list[bytes]:
+def text_to_speech(text: str, language_code: str = "en", scripture_short_name: str | None = None) -> list[bytes]:
     """Convenience wrapper — collects all streamed chunks into a list."""
-    return list(text_to_speech_stream(text, language_code))
+    return list(text_to_speech_stream(text, language_code, scripture_short_name))
 
 
 _MIME_MAP = {

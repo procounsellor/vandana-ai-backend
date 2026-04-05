@@ -10,6 +10,7 @@ const BOOK_META: Record<string, { icon: string; tagline: string }> = {
   arthashastra: { icon: "⚖️", tagline: "Statecraft, economics & strategy" },
   kama_sutra: { icon: "🌸", tagline: "The art of living & loving well" },
   upanishads: { icon: "🔥", tagline: "Nature of Brahman, Atman & moksha" },
+  baby_ganesha: { icon: "🐘", tagline: "Stories, fables & child-like wisdom" },
 };
 
 interface Scripture {

@@ -57,7 +57,7 @@ def avatar_chat(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    audio_chunks = text_to_speech(message.content, language_code=request.language_code)
+    audio_chunks = text_to_speech(message.content, language_code=request.language_code, scripture_short_name=request.scripture_short_name)
 
     return {
         "conversation_id": str(conversation.id),
@@ -125,9 +125,10 @@ async def avatar_voice_stream(
         # Embedding should be ready by now (or very close)
         query_embedding = embed_future.result()
 
+    from app.services.chat import get_scripture_short_names
     relevant_verses = search_verses_by_embedding(
         query_embedding, db, top_k=3,
-        scripture_short_names=[scripture_short_name or "gita"],
+        scripture_short_names=get_scripture_short_names(scripture_short_name),
     )
     verse_context = build_verse_context(relevant_verses, language_code=language_code, scripture_short_name=scripture_short_name)
     cited_verse_ids = [str(v.id) for v in relevant_verses]
@@ -142,7 +143,7 @@ async def avatar_voice_stream(
     ]
 
     sarvam_lang = LANGUAGE_MAP.get(language_code, "en-IN")
-    speaker = TTS_SPEAKERS.get(language_code, "anushka")
+    speaker = "anushka" if scripture_short_name == "baby_ganesha" else TTS_SPEAKERS.get(language_code, "anushka")
     conv_id = str(conversation.id)
 
     def generate():
@@ -160,7 +161,7 @@ async def avatar_voice_stream(
             if clean:
                 idx = submitted
                 submitted += 1
-                pending[idx] = tts_pool.submit(_tts_chunk, clean, sarvam_lang, speaker)
+                pending[idx] = tts_pool.submit(_tts_chunk, clean, sarvam_lang, speaker, scripture_short_name)
 
         def flush_ready():
             nonlocal yielded
@@ -227,14 +228,15 @@ async def avatar_voice_stream(
 def list_scriptures(db: Session = Depends(get_db)):
     """List all available scriptures."""
     from app.models import Scripture
-    from app.services.chat import SCRIPTURE_PROMPTS
+    from app.services.chat import SCRIPTURE_PROMPTS, MULTI_SCRIPTURE_MAP, get_scripture_short_names
     scriptures = db.query(Scripture).all()
     seeded = {s.short_name for s in scriptures}
     return [
         {
             "short_name": key,
             "name": val["name"],
-            "available": key in seeded,
+            # For multi-book characters (e.g. baby_ganesha), mark available if any source book is seeded
+            "available": any(s in seeded for s in get_scripture_short_names(key)),
         }
         for key, val in SCRIPTURE_PROMPTS.items()
     ]

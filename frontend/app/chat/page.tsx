@@ -27,7 +27,9 @@ export default function ChatPage() {
     ? "/home/krishna-talking.mp4"
     : store.scriptureShortName === "chanakya_neeti" || store.scriptureShortName === "arthashastra" || store.scriptureShortName === "kama_sutra"
     ? "/home/chanakya-talking.mp4"
-    : "/home/ganesha-talking.mp4";
+    : store.scriptureShortName === "baby_ganesha"
+    ? "/home/baby-ganesha-talking.mp4"
+    : "/home/ganesha-talking.mp4"; // ganesha, upanishads, yoga_sutras
 
   useEffect(() => {
     const video = videoRef.current;
@@ -300,20 +302,6 @@ export default function ChatPage() {
                 )}
               </div>
 
-              {/* Last assistant message as floating subtitle */}
-              {store.messages.length > 0 && (() => {
-                const last = [...store.messages].reverse().find(m => m.role === "assistant");
-                return last && last.content !== "…" ? (
-                  <motion.p
-                    key={last.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center text-sm leading-relaxed px-4 max-w-lg"
-                    style={{ fontFamily: "var(--font-cormorant)", color: "#c8a96e", fontSize: "1.05rem" }}>
-                    {last.content}
-                  </motion.p>
-                ) : null;
-              })()}
 
               {/* Status + mic */}
               <div className="flex flex-col items-center gap-3">

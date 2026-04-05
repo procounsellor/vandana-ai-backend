@@ -276,8 +276,8 @@ function About() {
             {/* Stat cards */}
             <div className="grid grid-cols-3 gap-3 mt-4">
               {[
-                { num: "6", label: "Scriptures" },
-                { num: "1200+", label: "Verses" },
+                { num: "7", label: "Characters" },
+                { num: "1400+", label: "Verses" },
                 { num: "∞", label: "Wisdom" },
               ].map(({ num, label }) => (
                 <div key={label} className="flex flex-col items-center justify-center py-5 rounded-xl"
@@ -301,6 +301,7 @@ const SCRIPTURES = [
   { icon: "♟️", name: "Chanakya Neeti", tagline: "Ethics & practical wisdom", short: "chanakya_neeti" },
   { icon: "⚖️", name: "Arthashastra", tagline: "Statecraft & strategy", short: "arthashastra" },
   { icon: "🌸", name: "Kama Sutra", tagline: "The art of living well", short: "kama_sutra" },
+  { icon: "🐘", name: "Baby Ganesha", tagline: "Stories, fables & child-like wisdom", short: "baby_ganesha" },
 ];
 
 function ScriptureShowcase() {
@@ -314,7 +315,7 @@ function ScriptureShowcase() {
           className="text-center mb-12">
           <p className="text-xs tracking-[5px] uppercase mb-4" style={{ color: GOLD, fontFamily: "var(--font-cinzel)" }}>Scriptures</p>
           <h2 className="text-4xl md:text-5xl mb-4" style={{ fontFamily: "var(--font-cormorant)", color: "#fff8ee", fontWeight: 300 }}>
-            Six paths of ancient wisdom
+            Seven paths of ancient wisdom
           </h2>
           <Divider />
         </motion.div>
@@ -480,7 +481,7 @@ function TwoPaths() {
 function Features() {
   const features = [
     { icon: "🎙️", title: "Voice-First", desc: "Speak naturally and receive spoken guidance. Vandana's voice carries a temple-like resonance — reverb, warmth, and presence." },
-    { icon: "📖", title: "6 Sacred Scriptures", desc: "Choose from the Bhagavad Gita, Yoga Sutras, Upanishads, Chanakya Neeti, Arthashastra, or Kama Sutra — each with its own wisdom and persona." },
+    { icon: "📖", title: "7 Sacred Characters", desc: "Choose from the Bhagavad Gita, Yoga Sutras, Upanishads, Chanakya Neeti, Arthashastra, Kama Sutra, or Baby Ganesha — each with its own wisdom and persona." },
     { icon: "🌐", title: "Multilingual", desc: "Converse in English or Hindi. Vandana understands your language and responds in kind." },
     { icon: "💬", title: "Contextual", desc: "Vandana remembers your conversation, building a continuous dialogue rather than isolated responses." },
     { icon: "🔒", title: "Private & Secure", desc: "Sign in with Google to save your conversations. Guest access allows 3 free queries — no account required to begin." },
