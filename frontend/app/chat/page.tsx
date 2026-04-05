@@ -1,10 +1,10 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useStore } from "@/lib/store";
 import { voiceStream, fetchConversations } from "@/lib/api";
-import AvatarVisualizer from "@/components/AvatarVisualizer";
 import BookSelector from "@/components/BookSelector";
+import ModeSelector from "@/components/ModeSelector";
 import ChatPanel from "@/components/ChatPanel";
 import HistorySidebar from "@/components/HistorySidebar";
 import LoginModal from "@/components/LoginModal";
@@ -20,7 +20,25 @@ export default function ChatPage() {
 
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioQueueRef = useRef<string[]>([]);
+
+  const avatarVideo = store.scriptureShortName === "gita"
+    ? "/home/krishna-talking.mp4"
+    : store.scriptureShortName === "chanakya_neeti" || store.scriptureShortName === "arthashastra" || store.scriptureShortName === "kama_sutra"
+    ? "/home/chanakya-talking.mp4"
+    : "/home/ganesha-talking.mp4";
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isSpeaking) {
+      video.play().catch(() => {});
+    } else {
+      video.pause();
+      video.currentTime = 0;
+    }
+  }, [isSpeaking]);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
@@ -241,14 +259,103 @@ export default function ChatPage() {
 
       {/* Main */}
       <div className="flex flex-1 overflow-hidden">
-        {!store.scriptureShortName && store.messages.length === 0 ? (
+
+        {/* Step 1: Pick scripture */}
+        {!store.scriptureShortName && (
           <BookSelector onSelect={(s) => store.setScripture(s)} />
-        ) : (
+        )}
+
+        {/* Step 2: Pick mode */}
+        {store.scriptureShortName && !store.mode && (
+          <ModeSelector
+            onSelect={(m) => store.setMode(m)}
+            onBack={() => store.newConversation()}
+          />
+        )}
+
+        {/* Step 3a: TALK mode — full screen video */}
+        {store.scriptureShortName && store.mode === "talk" && (
+          <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden">
+            {/* Full-screen video */}
+            <div className="relative w-full h-full max-w-2xl mx-auto flex flex-col items-center justify-center gap-6 px-4">
+              <div className="relative w-full rounded-3xl overflow-hidden"
+                style={{
+                  boxShadow: isSpeaking ? "0 0 60px #f0c06066, 0 0 120px #8b691422" : "0 0 20px #3d240044",
+                  transition: "box-shadow 0.5s ease",
+                  maxHeight: "65vh",
+                }}>
+                <video
+                  ref={videoRef}
+                  src={avatarVideo}
+                  loop
+                  muted
+                  playsInline
+                  className="w-full object-cover"
+                  style={{ opacity: isSpeaking ? 1 : 0.75, transition: "opacity 0.4s ease" }}
+                />
+                {/* Listening pulse ring */}
+                {isRecording && (
+                  <div className="absolute inset-0 rounded-3xl animate-pulse"
+                    style={{ border: "2px solid #ff4444", boxShadow: "inset 0 0 40px #ff000022" }} />
+                )}
+              </div>
+
+              {/* Last assistant message as floating subtitle */}
+              {store.messages.length > 0 && (() => {
+                const last = [...store.messages].reverse().find(m => m.role === "assistant");
+                return last && last.content !== "…" ? (
+                  <motion.p
+                    key={last.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-center text-sm leading-relaxed px-4 max-w-lg"
+                    style={{ fontFamily: "var(--font-cormorant)", color: "#c8a96e", fontSize: "1.05rem" }}>
+                    {last.content}
+                  </motion.p>
+                ) : null;
+              })()}
+
+              {/* Status + mic */}
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-xs tracking-widest" style={{ color: isSpeaking ? "#f0c060" : "#6b4f20" }}>
+                  {status || (isRecording ? "Tap to stop" : "Tap to speak")}
+                </p>
+                <motion.button
+                  onClick={toggleRecording}
+                  whileTap={{ scale: 0.92 }}
+                  className="w-20 h-20 rounded-full flex items-center justify-center text-3xl"
+                  style={{
+                    background: isRecording ? "#8b0000" : "#2a1800",
+                    border: `3px solid ${isRecording ? "#ff4444" : "#8b6914"}`,
+                    color: "#f0c060",
+                    boxShadow: isRecording ? "0 0 30px #ff000055" : "0 0 15px #8b691422",
+                  }}
+                >
+                  {isRecording ? "⏹️" : "🎤"}
+                </motion.button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3b: CHAT mode — original layout */}
+        {store.scriptureShortName && store.mode === "chat" && (
           <>
             {/* Avatar panel — desktop only */}
             <div className="hidden md:flex w-[280px] shrink-0 flex-col items-center justify-center gap-5 p-5"
               style={{ borderRight: "1px solid #3d2400" }}>
-              <AvatarVisualizer isSpeaking={isSpeaking} analyserRef={analyserRef} />
+              <div className="relative w-full rounded-2xl overflow-hidden"
+                style={{ boxShadow: isSpeaking ? "0 0 30px #f0c06044" : "none", transition: "box-shadow 0.4s ease" }}>
+                <video
+                  ref={videoRef}
+                  src={avatarVideo}
+                  loop
+                  muted
+                  playsInline
+                  className="w-full object-cover"
+                  style={{ opacity: isSpeaking ? 1 : 0.6, transition: "opacity 0.4s ease" }}
+                />
+              </div>
               <p className="text-xs tracking-widest transition-colors" style={{ color: isSpeaking ? "#f0c060" : "#6b4f20" }}>
                 {status || (isRecording ? "Tap to stop" : "Tap to speak")}
               </p>
@@ -270,24 +377,27 @@ export default function ChatPage() {
             <ChatPanel isTyping={isTyping} status={status} onSendText={handleSendText} />
           </>
         )}
+
       </div>
 
-      {/* Mobile mic bar */}
-      <div className={`${(!store.scriptureShortName && store.messages.length === 0) ? "hidden" : ""} md:hidden flex items-center justify-center py-3 shrink-0`}
-        style={{ borderTop: "1px solid #3d2400" }}>
-        <motion.button
-          onClick={toggleRecording}
-          whileTap={{ scale: 0.92 }}
-          className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
-          style={{
-            background: isRecording ? "#8b0000" : "#2a1800",
-            border: `2px solid ${isRecording ? "#ff4444" : "#8b6914"}`,
-            color: "#f0c060",
-          }}
-        >
-          {isRecording ? "⏹️" : "🎤"}
-        </motion.button>
-      </div>
+      {/* Mobile mic bar — chat mode only */}
+      {store.mode === "chat" && (
+        <div className="md:hidden flex items-center justify-center py-3 shrink-0"
+          style={{ borderTop: "1px solid #3d2400" }}>
+          <motion.button
+            onClick={toggleRecording}
+            whileTap={{ scale: 0.92 }}
+            className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
+            style={{
+              background: isRecording ? "#8b0000" : "#2a1800",
+              border: `2px solid ${isRecording ? "#ff4444" : "#8b6914"}`,
+              color: "#f0c060",
+            }}
+          >
+            {isRecording ? "⏹️" : "🎤"}
+          </motion.button>
+        </div>
+      )}
 
       <HistorySidebar open={historyOpen} onClose={() => setHistoryOpen(false)} />
       <LoginModal />

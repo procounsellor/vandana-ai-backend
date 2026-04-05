@@ -27,6 +27,7 @@ interface Store {
   language: string;
   history: Conversation[];
   scriptureShortName: string | null;
+  mode: "talk" | "chat" | null;
   setConversationId: (id: string | null) => void;
   addMessage: (msg: Message) => void;
   setMessages: (msgs: Message[]) => void;
@@ -34,6 +35,7 @@ interface Store {
   setLanguage: (lang: string) => void;
   setHistory: (h: Conversation[]) => void;
   setScripture: (s: string) => void;
+  setMode: (m: "talk" | "chat") => void;
   newConversation: () => void;
 
   // UI
@@ -60,6 +62,7 @@ export const useStore = create<Store>()(
       language: "en",
       history: [],
       scriptureShortName: null,
+      mode: null,
       setConversationId: (id) => set({ conversationId: id }),
       addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
       setMessages: (msgs) => set({ messages: msgs }),
@@ -74,7 +77,8 @@ export const useStore = create<Store>()(
       setLanguage: (language) => set({ language }),
       setHistory: (history) => set({ history }),
       setScripture: (scriptureShortName) => set({ scriptureShortName }),
-      newConversation: () => set({ conversationId: null, messages: [], scriptureShortName: null }),
+      setMode: (mode) => set({ mode }),
+      newConversation: () => set({ conversationId: null, messages: [], scriptureShortName: null, mode: null }),
 
       // UI
       showLoginModal: false,
