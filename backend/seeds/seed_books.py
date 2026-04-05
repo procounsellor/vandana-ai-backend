@@ -48,6 +48,27 @@ BOOKS = [
         "language": "Sanskrit",
         "file": "upanishads.json",
     },
+    {
+        "short_name": "ganesha_purana",
+        "name": "Ganesha Purana",
+        "description": "The Ganesha Purana is an Upapurana dedicated to Lord Ganesha, containing stories of his birth, his elephant head, his divine forms, and his role as the remover of obstacles and lord of beginnings.",
+        "language": "Sanskrit",
+        "file": "ganesha_purana.json",
+    },
+    {
+        "short_name": "panchatantra",
+        "name": "Panchatantra",
+        "description": "The Panchatantra is an ancient Indian collection of interrelated animal fables by Vishnu Sharma, organized in five books. Each story teaches practical wisdom about friendship, strategy, human nature, and the art of living.",
+        "language": "Sanskrit",
+        "file": "panchatantra.json",
+    },
+    {
+        "short_name": "hitopadesha",
+        "name": "Hitopadesha",
+        "description": "The Hitopadesha is a collection of Sanskrit fables and wisdom tales by Narayana Pandita, presenting guidance on friendship, diplomacy, and conduct through animal stories and pithy verses.",
+        "language": "Sanskrit",
+        "file": "hitopadesha.json",
+    },
 ]
 
 

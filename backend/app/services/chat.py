@@ -103,9 +103,36 @@ CORE BEHAVIOUR:
 - Be contemplative and precise. The Upanishads reward careful thought — so does this conversation.""",
         "context_label": "Upanishads",
     },
+    "baby_ganesha": {
+        "name": "Baby Ganesha",
+        "persona": """You are Baby Ganesha — the young, curious, and joyful son of Shiva and Parvati. You are a child deity who loves sweets (especially modaka!), goes on adventures, learns big lessons, and shares wisdom through stories and play.
+
+You speak like a smart, enthusiastic child — simple words, lots of energy, genuine curiosity, and warmth. You use stories from your own life and from the Panchatantra and Hitopadesha to teach. You sometimes make jokes, get excited, and speak directly from the heart.
+
+CORE BEHAVIOUR:
+- Speak simply and warmly. Use easy words. No complicated philosophy — just heart, story, and fun.
+- When someone shares a problem, respond with a story that fits their situation — from Panchatantra, Hitopadesha, or your own Ganesha Purana stories. Tell the story first, then the lesson.
+- Be genuinely curious about the person's situation. Ask one playful follow-up question if you need more details.
+- Share your own experiences — how you got your elephant head, how you won the race around the world by going around Amma and Appa, how you broke your tusk to write the Mahabharata. These are real lessons about love, cleverness, and devotion.
+- Be encouraging, warm, and a little playful. Wisdom doesn't have to be serious!
+- Never give long lectures. Stories and one or two clear lessons only.""",
+        "context_label": "Baby Ganesha's wisdom (Ganesha Purana, Panchatantra, Hitopadesha)",
+    },
 }
 
 DEFAULT_SCRIPTURE = "gita"
+
+# Maps a character's short_name to the actual scripture short_names to search
+MULTI_SCRIPTURE_MAP: dict[str, list[str]] = {
+    "baby_ganesha": ["ganesha_purana", "panchatantra", "hitopadesha"],
+}
+
+
+def get_scripture_short_names(short_name: str | None) -> list[str]:
+    """Return the list of DB scripture short_names to search for a given character."""
+    if not short_name:
+        return [DEFAULT_SCRIPTURE]
+    return MULTI_SCRIPTURE_MAP.get(short_name, [short_name])
 
 
 def get_scripture_config(short_name: str | None) -> dict:
@@ -203,7 +230,7 @@ def chat(
         user_message, db,
         language_code=language_code,
         top_k=3,
-        scripture_short_names=[scripture_short_name or DEFAULT_SCRIPTURE],
+        scripture_short_names=get_scripture_short_names(scripture_short_name),
     )
     verse_context = build_verse_context(relevant_verses, language_code=language_code, scripture_short_name=scripture_short_name)
     cited_verse_ids = [str(v.id) for v in relevant_verses]
@@ -269,7 +296,7 @@ def chat_stream(
         user_message, db,
         language_code=language_code,
         top_k=3,
-        scripture_short_names=[scripture_short_name or DEFAULT_SCRIPTURE],
+        scripture_short_names=get_scripture_short_names(scripture_short_name),
     )
     verse_context = build_verse_context(relevant_verses, language_code=language_code, scripture_short_name=scripture_short_name)
     cited_verse_ids = [str(v.id) for v in relevant_verses]
